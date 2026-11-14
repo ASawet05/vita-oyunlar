@@ -82,7 +82,7 @@ function fresh() {
     charge: 0, magnetT: 0, jetT: 0, bootsT: 0, x2T: 0, boardT: 0, invulnT: 0, chaseT: 0, introT: 0, stumble: 0, chaserZ: 16,
     untilRow: 30, prevPass: null, occ: [0, 0, 0], rowLog: [],
     nextPowerAt: 140 + Math.random() * 100, nextLetterAt: 90 + Math.random() * 80, nextBoxAt: 450 + Math.random() * 300, nextChargeAt: 20 + Math.random() * 15,
-    letterOut: false, crashT: 0, shake: 0, roofDist: 0, crashReason: "", final: null,
+    gen: { caps: 0, flat: 0, moving: 0 }, plan: null, letterOut: false, crashT: 0, shake: 0, roofDist: 0, crashReason: "", final: null,
     runStats: { jumps: 0, board: 0, power: 0, letters: 0 }
   };
 }
@@ -189,7 +189,13 @@ function canMoveTrain(lane, z0, vz) {
   });
 }
 function spawnRow(z, warmup) {
-  const pat = makeRowPattern(S.level, Math.random, S.prevPass, S.occ.map(v => v > 0));
+  // Hareketli tren planı: sonraki 2 sıra hedef şeridi boş bırakır (o sıralarda başka geçiş şeridi garanti), ardından tren gelir
+  if (!warmup && !S.plan && S.level >= 2 && Math.random() < Math.min(0.4, 0.1 + S.level * 0.035)) {
+    const cand = [0, 1, 2].filter(l => S.occ[l] <= 0);
+    if (cand.length) S.plan = { lane: cand[Math.floor(Math.random() * cand.length)], rows: 2 };
+  }
+  const occupied = S.occ.map(v => v > 0); if (S.plan) occupied[S.plan.lane] = true;
+  const pat = makeRowPattern(S.level, Math.random, S.prevPass, occupied);
   S.prevPass = pat.pass;
   S.rowLog = S.rowLog.filter(r => rowZ(r) < 4); S.rowLog.push({ at: S.dist - (z - SPAWN_Z), pass: pat.pass.slice() });
   pat.lanes.forEach((type, l) => {
@@ -201,14 +207,26 @@ function spawnRow(z, warmup) {
   pat.capsules.forEach(c => {
     // Rampasız trenlerin bir kısmı karşıdan hızla gelir (seviye arttıkça daha sık)
     const vzTry = Math.min(20, 8 + S.level * 1.2);
-    const moving = !warmup && !c.ramp && S.level >= 2 && Math.random() < Math.min(0.6, 0.2 + S.level * 0.08) && canMoveTrain(c.lane, z, vzTry);
+    // Rampalı adaylar da seçilebilir; hareket edecek trenin rampası kaldırılır (karşıdan gelen trene rampa olmaz)
+    const moving = !warmup && S.level >= 2 && (!c.ramp || Math.random() < 0.5) && Math.random() < Math.min(0.6, 0.25 + S.level * 0.07) && canMoveTrain(c.lane, z, vzTry);
+    if (moving) c.ramp = false;
     const vz = moving ? vzTry : 0;
+    if (!warmup) { S.gen.caps++; if (!c.ramp) S.gen.flat++; if (moving) S.gen.moving++; }
     const o = objs.spawn("capsule", c.lane, z - c.len / 2, 0, { len: c.len, ramp: c.ramp, color: Math.floor(Math.random() * 4), vz });
     S.occ[c.lane] = c.len + 6;
     if (!moving) roofs.push(o);
     // Çatı: yoğun su damlası dizisi (hareketli trende trenle birlikte gelir)
     for (let d = c.len / 2 - 1.5; d > -c.len / 2 + 1; d -= 1.6) objs.spawn("drop", c.lane, o.z + d, CAPSULE.top + 0.6, moving ? { vz, ride: o } : {});
   });
+  if (S.plan && --S.plan.rows <= 0) {
+    const L = S.plan.lane, len = 12 + Math.floor(Math.random() * 3) * 4, vz = Math.min(20, 8 + S.level * 1.2);
+    if (canMoveTrain(L, z, vz)) {
+      const o = objs.spawn("capsule", L, z - len / 2, 0, { len, ramp: false, color: Math.floor(Math.random() * 4), vz });
+      S.occ[L] = len + 6; S.gen.caps++; S.gen.moving++;
+      for (let d = len / 2 - 1.5; d > -len / 2 + 1; d -= 1.6) objs.spawn("drop", L, o.z + d, CAPSULE.top + 0.6, { vz, ride: o });
+    }
+    S.plan = null;
+  }
   const lane = (pat.free.length ? pat.free : pat.pass)[Math.floor(Math.random() * (pat.free.length || pat.pass.length))];
   if (S.jetT > 0) for (let i = 0; i < 6; i++) objs.spawn("drop", Math.random() < 0.3 ? 1 : lane, z + 2 + i * 2.4, 5.4);
   else if (!pat.capsules.length && Math.random() < 0.75) for (let i = 0; i < 5; i++) objs.spawn("drop", lane, z + 3 + i * 2, 0.55);
@@ -543,7 +561,7 @@ $("dkPlay").disabled = false;
 
 /* Test ve hata ayıklama arayüzü */
 window.DamarKosucusu = {
-  state: () => ({ mode: S.mode, lane: S.lane, x: +S.x.toFixed(2), y: +S.y.toFixed(2), airborne: S.airborne, sliding: S.slideK > 0.5, slam: S.slam, speed: +S.speed.toFixed(1), dist: Math.floor(S.dist), drops: S.drops, score: score(), level: S.level, charge: S.charge, magnet: S.magnetT, jet: S.jetT, boots: S.bootsT, x2: S.x2T, board: S.boardT, chase: S.chaseT, intro: S.introT, chaserZ: +S.chaserZ.toFixed(2), stumble: S.stumble, invuln: S.invulnT, roof: Math.floor(S.roofDist), crashReason: S.crashReason, objects: objs.list.length, capsules: objs.list.filter(o => o.type === "capsule").length, movingTrains: objs.list.filter(o => o.type === "capsule" && o.vz).length, shock: shockT > 0 }),
+  state: () => ({ mode: S.mode, lane: S.lane, x: +S.x.toFixed(2), y: +S.y.toFixed(2), airborne: S.airborne, sliding: S.slideK > 0.5, slam: S.slam, speed: +S.speed.toFixed(1), dist: Math.floor(S.dist), drops: S.drops, score: score(), level: S.level, charge: S.charge, magnet: S.magnetT, jet: S.jetT, boots: S.bootsT, x2: S.x2T, board: S.boardT, chase: S.chaseT, intro: S.introT, chaserZ: +S.chaserZ.toFixed(2), stumble: S.stumble, invuln: S.invulnT, roof: Math.floor(S.roofDist), crashReason: S.crashReason, objects: objs.list.length, capsules: objs.list.filter(o => o.type === "capsule").length, movingTrains: objs.list.filter(o => o.type === "capsule" && o.vz).length, gen: Object.assign({}, S.gen), shock: shockT > 0 }),
   profile: () => JSON.parse(JSON.stringify(profile)),
   start, makeRowPattern, useBoard,
   debug: {
