@@ -12,6 +12,7 @@ oyun1.html        Vitamin Hafıza Eşleştirme   → css/oyun1.css, js/oyun1.js
 oyun2.html        Sağlıklı Sepet (refleks)     → css/oyun2.css, js/oyun2.js
 vitablock.html    VitaBlock (8x8 blok bulmaca) → css/vitablock.css, js/vitablock.js
 damar-kosucusu.html  Damar Yolu Koşucusu (3D)  → css/damar-kosucusu.css, js/damar-kosucusu.js + js/damar/*.js (ES modülleri)
+vucut-savunmasi.html Vücut Savunması (strateji) → css/vucut-savunmasi.css, js/vucut-savunmasi.js + js/vucut/*.js (ES modülleri)
 ```
 
 Damar Yolu Koşucusu, Three.js r160'ı jsDelivr CDN'inden (sabit sürüm) yükler; diğer oyunlar tamamen bağımsızdır.

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vücut Savunması · Vita Oyunlar</title>
+<meta name="description" content="Vücut Savunması: vitamin ve mineral kuleleriyle bağışıklık merkezini virüs dalgalarına karşı koruyun.">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Cpath d='M32 8l20 8v14c0 13-8 22-20 26C20 52 12 43 12 30V16z' fill='%230d9488'/%3E%3Ccircle cx='32' cy='30' r='8' fill='%23f97316'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/ortak.css">
+<link rel="stylesheet" href="css/vucut-savunmasi.css">
+</head>
+<body class="vs-body">
+<header class="vs-bar">
+  <a class="vs-back" href="index.html" aria-label="Oyunlar menüsüne dön">← Oyunlar Menüsü</a>
+  <div class="vs-stats">
+    <div class="vs-stat vs-stat--atp" title="ATP Enerji Puanı"><small>⚡ ATP</small><b id="vsAtp">150</b></div>
+    <div class="vs-stat"><small>Dalga</small><b id="vsWave">—</b></div>
+    <div class="vs-stat vs-stat--best"><small>Rekor</small><b id="vsBest">0</b></div>
+    <div class="vs-stat vs-stat--life"><small>Bariyer</small><b id="vsLives">❤️ 3</b></div>
+  </div>
+  <div class="vs-btns">
+    <button type="button" class="vs-icon vs-speed" id="vsSpeed" aria-pressed="false" aria-label="Oyun hızı (1x / 2x)" title="Hız: 1x / 2x (F)">1x</button>
+    <button type="button" class="vs-icon" id="vsPauseBtn" aria-label="Duraklat" title="Duraklat (P)" disabled>⏸</button>
+    <button type="button" class="vs-icon" id="vsSound" aria-pressed="true" aria-label="Sesi kapat">🔊</button>
+  </div>
+</header>
+
+<nav class="vs-panel" aria-label="Savunma birimleri">
+  <div class="vs-units" id="vsUnits"></div>
+  <button type="button" class="vs-card vs-recycle" id="vsRecycle" aria-pressed="false" title="Hücre Temizle / Geri Dönüştür: birimi kaldır, ATP'nin %50'si iade (R)"><span class="vs-recycle-ico" aria-hidden="true">♻️</span><span class="vs-name">Geri Dönüştür</span><span class="vs-cost">%50</span></button>
+</nav>
+
+<main class="vs-board" id="vsBoard">
+  <canvas id="vsCanvas" role="img" aria-label="Vücut Savunması oyun alanı: 5 koridor, 9 sütun"></canvas>
+  <div class="vs-toasts" id="vsToasts" aria-live="polite"></div>
+  <p class="vs-rotate" id="vsRotate" hidden>📱↻ Telefonu yatay çevirirseniz oyun alanı büyür</p>
+
+  <div class="vs-overlay" id="vsStart">
+    <div class="vs-modal">
+      <div class="vs-modal-emoji" aria-hidden="true">🛡️🦠</div>
+      <h1>Vücut Savunması</h1>
+      <p class="vs-lead">Bağışıklık Merkezi'ni sağdan gelen virüs dalgalarına karşı koruyun. Düşen <b>ATP kürelerine</b> dokunun (veya üzerinden geçin), panelden birim seçip bir hücreye yerleştirin.</p>
+      <ul class="vs-help">
+        <li><b style="color:#fde047">D3</b> ATP üretir</li><li><b style="color:#fdba74">C</b> antioksidan atar</li><li><b style="color:#d8b4fe">Mg</b> sağlam duvar</li>
+        <li><b style="color:#bae6fd">Zn</b> %50 yavaşlatır</li><li><b style="color:#fda4af">B12</b> alan hasarı</li><li><b style="color:#5eead4">♻️</b> %50 iade</li>
+      </ul>
+      <p class="vs-keys">Bilgisayar: <kbd>1</kbd>–<kbd>5</kbd> birim · <kbd>R</kbd> geri dönüştür · <kbd>Esc</kbd> iptal · <kbd>P</kbd> duraklat · <kbd>F</kbd> hız</p>
+      <button type="button" class="vo-btn vs-start" id="vsStartBtn">▶ Savunmayı Başlat</button>
+    </div>
+  </div>
+
+  <div class="vs-overlay" id="vsPause" hidden>
+    <div class="vs-modal vs-modal--small"><h2>Duraklatıldı</h2><button type="button" class="vo-btn" id="vsResume">▶ Devam et</button></div>
+  </div>
+
+  <div class="vs-overlay" id="vsOver" hidden role="dialog" aria-modal="true" aria-labelledby="vsOverTitle">
+    <div class="vs-modal">
+      <div class="vs-modal-emoji" aria-hidden="true">🧬</div>
+      <h2 id="vsOverTitle">Savunma Hattı Düştü</h2>
+      <div class="vs-over-grid">
+        <div><small>Ulaşılan dalga</small><b id="vsOverWave">0</b></div>
+        <div><small>Yok edilen virüs</small><b id="vsOverKills">0</b></div>
+        <div><small>Rekor dalga</small><b id="vsOverBest">0</b></div>
+      </div>
+      <p class="vs-over-note" id="vsOverNote"></p>
+      <div class="vo-modal-actions">
+        <button type="button" class="vo-btn" id="vsAgain">↻ Savunmayı Yeniden Başlat</button>
+        <a class="vo-btn vo-btn--ghost" href="index.html">Oyunlar Menüsü</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script type="module" src="js/vucut-savunmasi.js"></script>
+</body>
+</html>
