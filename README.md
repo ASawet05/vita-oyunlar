@@ -28,3 +28,7 @@ Damar Yolu Koşucusu: su damlaları yalnızca para birimidir; turkuaz enerji kap
 3. En iyi skoru lobide göstermek için oyunda `localStorage.setItem("vo_best_<ad>", "…")` yazın ve karta `data-best="vo_best_<ad>"` ekleyin.
 
 Oyunlar eğlence ve genel bilgi amaçlıdır; tıbbi tavsiye yerine geçmez.
+
+VitaKelime (vitakelime.html → css/vitakelime.css, js/vitakelime.js + js/kelime/{motor,ses}.js): kelime çarkı + kesişen bulmaca.
+Sözlük data/turkce-sozluk.json (3.000+ büyük harfli Türkçe kelime, tr-TR dönüşümü; sağlık/vitamin terimleri "saglik" listesinde).
+Bölümler js/kelime/motor.js ile prosedürel üretilir; oynanan kökler localStorage'da (vo_kelime_v1) tutulur ve tekrar edilmez.

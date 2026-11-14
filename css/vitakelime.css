@@ -1,0 +1,105 @@
+/* VitaKelime — koyu lacivert/turkuaz cam (glassmorphism) arayüz */
+html,body.vk-body{height:100%;overflow:hidden;overscroll-behavior:none}
+.vk-body{display:flex;flex-direction:column;height:100dvh;margin:0;color:#e2e8f0;background:radial-gradient(120% 70% at 50% 0%,#134e4a 0%,#0b1120 55%),radial-gradient(80% 60% at 100% 100%,#312e81 0%,transparent 60%),#0b1120;background-blend-mode:screen;-webkit-user-select:none;user-select:none}
+.vk-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:8px 10px;padding-top:max(8px,env(safe-area-inset-top));background:rgba(15,23,42,.45);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.08)}
+.vk-back{flex:0 0 auto;display:inline-flex;align-items:center;min-height:38px;padding:0 10px;border-radius:12px;border:1px solid rgba(94,234,212,.4);background:rgba(13,148,136,.15);color:#ccfbf1;font-size:12.5px;font-weight:900;text-decoration:none;white-space:nowrap}
+.vk-title{flex:1;min-width:0;text-align:center;line-height:1.15}
+.vk-title > b{display:block;font-size:17px;font-weight:900;letter-spacing:.02em;background:linear-gradient(90deg,#5eead4,#fde047);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vk-lvl{font-size:11.5px;font-weight:800;color:#94a3b8}
+.vk-lvl b{color:#e2e8f0}
+.vk-health{margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(16,185,129,.2);border:1px solid rgba(110,231,183,.5);color:#a7f3d0;font-size:10.5px}
+.vk-health[hidden]{display:none}
+.vk-icon{flex:0 0 auto;width:38px;height:38px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:16px;cursor:pointer}
+.vk-icon[aria-pressed="false"]{opacity:.6}
+.vk-back:focus-visible,.vk-icon:focus-visible,.vk-piggy:focus-visible,.vk-hintbtn:focus-visible,.vk-shuffle:focus-visible{outline:3px solid #fde047;outline-offset:2px}
+
+.vk-main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:6px 10px max(10px,env(safe-area-inset-bottom))}
+.vk-board{position:relative;flex:1 1 auto;min-height:120px;display:flex;align-items:center;justify-content:center}
+.vk-grid{display:grid;grid-template-columns:repeat(var(--cols,5),var(--cs,40px));grid-template-rows:repeat(var(--rows,5),var(--cs,40px));gap:4px}
+.vk-void{visibility:hidden}
+.vk-cell{position:relative;display:flex;align-items:center;justify-content:center;border-radius:calc(var(--cs) * .22);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px -10px rgba(0,0,0,.8);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.vk-cell span{font-size:calc(var(--cs) * .55);font-weight:900;color:#0f172a;opacity:0;transform:scale(.4);transition:opacity .2s,transform .25s}
+.vk-cell.is-open{background:linear-gradient(160deg,#5eead4,#14b8a6);border-color:#99f6e4;box-shadow:0 0 14px -4px rgba(45,212,191,.8),inset 0 1px 0 rgba(255,255,255,.5)}
+.vk-cell.is-open span{opacity:1;transform:none}
+.vk-cell.is-hint{background:linear-gradient(160deg,#fde68a,#f59e0b);border-color:#fef3c7;box-shadow:0 0 14px -4px rgba(250,204,21,.8)}
+.vk-cell.is-pop{animation:vk-pop .45s ease both}
+.vk-cell.is-dup{animation:vk-dup .5s ease}
+@keyframes vk-pop{0%{transform:scale(.6)}55%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes vk-dup{0%,100%{transform:none}30%{transform:translateY(-4px);filter:brightness(1.4)}}
+
+.vk-preview{flex:0 0 auto;align-self:center;min-height:38px;min-width:60px;margin:6px 0;padding:4px 16px;border-radius:999px;font-size:22px;font-weight:900;letter-spacing:.12em;color:#fff;background:rgba(15,23,42,.6);border:1px solid rgba(94,234,212,.4);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s}
+.vk-preview.is-empty{visibility:hidden}
+.vk-preview.is-good{background:rgba(16,185,129,.35);border-color:#6ee7b7}
+.vk-preview.is-extra{background:rgba(147,51,234,.35);border-color:#d8b4fe}
+.vk-preview.is-dup{background:rgba(234,179,8,.3);border-color:#fde047}
+.vk-preview.is-bad{background:rgba(220,38,38,.3);border-color:#fca5a5}
+.vk-preview.is-shake{animation:vk-shake .38s ease}
+@keyframes vk-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+
+.vk-controls{flex:0 0 auto;display:grid;grid-template-columns:56px 1fr 56px;align-items:center;gap:8px}
+.vk-wheel{position:relative;justify-self:center;width:min(300px,62vw,38dvh);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 50% 40%,rgba(255,255,255,.1),rgba(15,23,42,.55));border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 0 40px rgba(45,212,191,.12),0 20px 40px -20px rgba(0,0,0,.8);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);touch-action:none}
+.vk-wheel.is-spin{animation:vk-spin .45s ease}
+@keyframes vk-spin{0%{transform:rotate(0)}40%{transform:rotate(-14deg) scale(.97)}100%{transform:rotate(0)}}
+.vk-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.vk-line{fill:none;stroke:#5eead4;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
+.vk-line-glow{fill:none;stroke:rgba(94,234,212,.35);stroke-width:18;stroke-linecap:round;stroke-linejoin:round;filter:blur(4px)}
+.vk-letter{position:absolute;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1.5px solid rgba(255,255,255,.25);background:linear-gradient(160deg,rgba(255,255,255,.95),rgba(203,213,225,.9));color:#0f172a;font-weight:900;cursor:pointer;padding:0;box-shadow:0 6px 16px -8px rgba(0,0,0,.8);transition:transform .12s,background .12s,color .12s;touch-action:none}
+.vk-letter.is-on{background:linear-gradient(160deg,#5eead4,#0d9488);color:#fff;border-color:#ccfbf1;transform:scale(1.1);box-shadow:0 0 18px rgba(45,212,191,.75)}
+.vk-shuffle{position:absolute;left:50%;top:50%;width:46px;height:46px;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#99f6e4;font-size:22px;font-weight:900;cursor:pointer}
+.vk-shuffle:active{transform:translate(-50%,-50%) rotate(90deg)}
+
+/* Sol kenar: Ekstra Kelime Kumbarası (dikey dolum göstergesi) */
+.vk-piggy{justify-self:start;display:flex;flex-direction:column;align-items:center;gap:4px;width:52px;padding:7px 4px;border-radius:16px;border:1px solid rgba(216,180,254,.4);background:rgba(147,51,234,.14);color:#f3e8ff;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.vk-piggy-ico{font-size:22px;line-height:1}
+.vk-piggy-bar{position:relative;width:14px;height:70px;border-radius:999px;background:rgba(2,6,23,.6);border:1px solid rgba(216,180,254,.4);overflow:hidden}
+.vk-piggy-bar i{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(0deg,#a855f7,#f0abfc);transition:height .35s ease}
+.vk-piggy small{font-size:10.5px;font-weight:900}
+.vk-piggy.is-pop{animation:vk-pop .6s ease}
+.vk-hintbtn{justify-self:end;position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;width:52px;padding:8px 4px;border-radius:16px;border:1px solid rgba(253,224,71,.45);background:rgba(234,179,8,.14);color:#fef9c3;font-size:22px;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.vk-hintbtn b{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#f59e0b;color:#1f2937;font-size:11.5px;line-height:20px}
+.vk-hintbtn small{font-size:10px;font-weight:900}
+.vk-hintbtn.is-empty{opacity:.55}
+.vk-hintbtn.is-shake{animation:vk-shake .38s ease}
+
+.vk-toasts{position:absolute;left:0;right:0;top:4px;display:flex;flex-direction:column;align-items:center;gap:5px;pointer-events:none;z-index:4}
+.vk-toast{padding:6px 14px;border-radius:999px;font-size:13px;font-weight:900;color:#0f172a;background:#5eead4;box-shadow:0 10px 24px -10px rgba(0,0,0,.8);animation:vk-toast 1.75s ease forwards}
+.vk-toast--extra{background:linear-gradient(90deg,#d8b4fe,#f0abfc)}
+.vk-toast--gold{background:linear-gradient(90deg,#fde047,#fdba74)}
+.vk-toast--dup{background:#cbd5e1}
+.vk-toast--level{background:linear-gradient(90deg,#5eead4,#a5f3fc)}
+@keyframes vk-toast{0%{opacity:0;transform:translateY(-6px) scale(.94)}10%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-8px)}}
+.vk-fly{position:fixed;z-index:20;color:#f0abfc;font-size:22px;font-weight:900;pointer-events:none;transition:transform .6s cubic-bezier(.5,0,.6,1),opacity .6s;text-shadow:0 0 12px #c084fc}
+
+.vk-overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(2,6,23,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.vk-overlay[hidden]{display:none}
+.vk-card{width:min(400px,100%);max-height:100%;overflow:auto;padding:18px;border-radius:22px;text-align:center;background:rgba(15,23,42,.82);border:1px solid rgba(94,234,212,.35);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 24px 60px -24px rgba(0,0,0,.9)}
+.vk-card--small{width:min(300px,100%)}
+.vk-card h2{margin:4px 0 6px;font-size:21px;font-weight:900;color:#fff}
+.vk-muted{margin:4px 0 10px;font-size:13px;color:#94a3b8}
+.vk-root{color:#fde047;letter-spacing:.08em}
+.vk-done-emoji{font-size:40px;line-height:1;animation:vk-pop .6s ease}
+.vk-done-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.vk-done-grid div{padding:9px;border-radius:14px;background:rgba(2,6,23,.55);border:1px solid rgba(94,234,212,.22)}
+.vk-done-grid small{display:block;font-size:10.5px;font-weight:900;color:#94a3b8;text-transform:uppercase}
+.vk-done-grid b{display:block;font-size:24px;font-weight:900;color:#fff}
+.vk-bonus{margin:0 0 10px;color:#fde047;font-weight:900}
+.vk-bonus[hidden]{display:none}
+.vk-next{width:100%;min-height:48px;font-size:16px}
+.vk-xlist{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:8px 0 10px}
+.vk-xw{padding:5px 10px;border-radius:999px;background:rgba(147,51,234,.25);border:1px solid rgba(216,180,254,.5);font-weight:900;letter-spacing:.06em}
+.vk-spin{width:34px;height:34px;margin:4px auto 8px;border-radius:50%;border:4px solid rgba(94,234,212,.25);border-top-color:#5eead4;animation:vk-rot .8s linear infinite}
+@keyframes vk-rot{to{transform:rotate(360deg)}}
+.vk-confetti{position:fixed;inset:0;pointer-events:none;z-index:11;overflow:hidden}
+.vk-confetti i{position:absolute;top:-12px;width:8px;height:14px;border-radius:2px;animation:vk-fall 2.2s ease-in forwards}
+@keyframes vk-fall{to{top:105%;transform:rotate(540deg) translateX(30px)}}
+
+/* Yatay telefon / kısa ekran: bulmaca solda, çark sağda */
+@media (orientation:landscape) and (max-height:560px){
+  .vk-main{display:grid;grid-template-columns:1fr auto;grid-template-rows:1fr auto;gap:4px 12px}
+  .vk-board{grid-row:1 / span 2}
+  .vk-preview{grid-column:2;grid-row:1;align-self:end;margin:0}
+  .vk-controls{grid-column:2;grid-row:2;grid-template-columns:52px auto 52px}
+  .vk-wheel{width:min(230px,58dvh)}
+}
+@media (max-width:360px){.vk-controls{grid-template-columns:48px 1fr 48px;gap:4px}.vk-piggy,.vk-hintbtn{width:46px}}
+@media (prefers-reduced-motion:reduce){.vk-cell.is-pop,.vk-wheel.is-spin,.vk-preview.is-shake,.vk-confetti i,.vk-done-emoji{animation:none}}

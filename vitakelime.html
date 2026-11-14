@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VitaKelime · Vita Oyunlar</title>
+<meta name="description" content="VitaKelime: harf çarkını kaydırarak kelimeler bulun, kesişen bulmacayı doldurun. Her bölüm yeni üretilir; sağlık ve vitamin terimleriyle zengin Türkçe sözlük.">
+<meta name="theme-color" content="#0b1120">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1120'/%3E%3Ccircle cx='32' cy='32' r='20' fill='none' stroke='%235eead4' stroke-width='4'/%3E%3Ctext x='32' y='40' font-size='22' font-family='Arial' font-weight='900' text-anchor='middle' fill='%23fde047'%3EK%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/ortak.css">
+<link rel="stylesheet" href="css/vitakelime.css">
+</head>
+<body class="vk-body">
+<header class="vk-bar">
+  <a class="vk-back" href="index.html" aria-label="Oyunlar menüsüne dön"><span class="bk-long">← Oyunlar Menüsü</span><span class="bk-short">← Menü</span></a>
+  <div class="vk-title">
+    <b>VitaKelime</b>
+    <span class="vk-lvl">Bölüm <b id="vkLevel">1</b> · <span id="vkProgress">0/0</span><span class="vk-health" id="vkHealth" hidden>🩺 Sağlık</span></span>
+  </div>
+  <button type="button" class="vk-icon" id="vkSound" aria-pressed="true" aria-label="Sesi kapat">🔊</button>
+</header>
+
+<main class="vk-main">
+  <section class="vk-board" id="vkBoard" aria-label="Bulmaca">
+    <div class="vk-grid" id="vkGrid" role="img"></div>
+    <div class="vk-toasts" id="vkToasts" aria-live="polite"></div>
+  </section>
+
+  <div class="vk-preview is-empty" id="vkPreview" aria-live="polite"></div>
+
+  <section class="vk-controls" aria-label="Harf çarkı ve araçlar">
+    <button type="button" class="vk-piggy" id="vkPiggy" aria-label="Ekstra Kelime Kumbarası: bulunan ekstra kelimeleri göster" title="Ekstra Kelime Kumbarası — 5 ekstra kelime = +1 ipucu">
+      <span class="vk-piggy-ico" aria-hidden="true">🐷</span>
+      <span class="vk-piggy-bar" aria-hidden="true"><i id="vkPiggyFill"></i></span>
+      <small id="vkPiggyN">0/5</small>
+    </button>
+    <div class="vk-wheel" id="vkWheel">
+      <svg class="vk-lines" id="vkLines" aria-hidden="true"></svg>
+      <button type="button" class="vk-shuffle" id="vkShuffle" aria-label="Harfleri karıştır (Boşluk)" title="Karıştır (Boşluk)">⟳</button>
+    </div>
+    <button type="button" class="vk-hintbtn" id="vkHint" aria-label="İpucu: kapalı bir harfi aç (H)" title="İpucu (H)">
+      <span aria-hidden="true">💡</span><b id="vkHintN">3</b><small>İpucu</small>
+    </button>
+  </section>
+</main>
+
+<div class="vk-confetti" id="vkConfetti" aria-hidden="true"></div>
+
+<div class="vk-overlay" id="vkLoading"><div class="vk-card vk-card--small"><div class="vk-spin" aria-hidden="true"></div><p>Sözlük yükleniyor…</p></div></div>
+<div class="vk-overlay" id="vkError" hidden><div class="vk-card vk-card--small"><h2>Sözlük yüklenemedi</h2><p>Bağlantınızı kontrol edip yeniden deneyin.</p><button type="button" class="vo-btn" id="vkRetry">↻ Yeniden dene</button></div></div>
+
+<div class="vk-overlay" id="vkExtras" hidden role="dialog" aria-modal="true" aria-labelledby="vkExtrasTitle">
+  <div class="vk-card">
+    <h2 id="vkExtrasTitle">🐷 Ekstra Kelime Kumbarası</h2>
+    <p class="vk-muted" id="vkExtrasInfo"></p>
+    <div class="vk-xlist" id="vkExtrasList"></div>
+    <p class="vk-muted">Izgarada olmayan geçerli kelimeler kumbaraya gider; her 5 ekstra kelime <b>+1 ipucu</b> kazandırır.</p>
+    <button type="button" class="vo-btn" id="vkExtrasClose">Tamam</button>
+  </div>
+</div>
+
+<div class="vk-overlay" id="vkDone" hidden role="dialog" aria-modal="true" aria-labelledby="vkDoneTitle">
+  <div class="vk-card">
+    <div class="vk-done-emoji" aria-hidden="true">🌟</div>
+    <h2 id="vkDoneTitle">Harika!</h2>
+    <p class="vk-muted">Bölüm <b id="vkDoneLevel">1</b> tamamlandı · Kök kelime: <b class="vk-root" id="vkDoneRoot"></b></p>
+    <div class="vk-done-grid">
+      <div><small>Izgara kelimesi</small><b id="vkDoneWords">0</b></div>
+      <div><small>Ekstra kelime</small><b id="vkDoneExtras">0</b></div>
+    </div>
+    <p class="vk-bonus" id="vkDoneBonus" hidden>🎁 Bölüm ödülü: +1 İpucu</p>
+    <button type="button" class="vo-btn vk-next" id="vkNext">Sonraki Bölüm ▶</button>
+  </div>
+</div>
+
+<script type="module" src="js/vitakelime.js"></script>
+</body>
+</html>
