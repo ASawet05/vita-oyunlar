@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Damar Yolu Koşucusu · Vita Oyunlar</title>
-<meta name="description" content="Damar Yolu Koşucusu: Nano-Koruyucu ile damar tünelinde koşun, plaklardan zıplayın, toksin kapılarının altından kayın, su damlalarını toplayın.">
+<meta name="description" content="Damar Yolu Koşucusu: Nano-Koruyucu ile damar tünelinde koşun, dev vitamin kapsüllerinin çatısına tırmanın, kaykay kullanın, VitaMağaza'dan kostüm ve aksesuar alın.">
 <meta name="theme-color" content="#14040a">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2314040a'/%3E%3Cpath d='M32 10c8 12 14 20 14 28a14 14 0 0 1-28 0c0-8 6-16 14-28z' fill='%2322d3ee'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
@@ -29,30 +29,52 @@
 <div class="dk-stage" id="dkStage">
   <canvas id="dkCanvas" aria-label="Damar Yolu Koşucusu 3D oyun alanı"></canvas>
   <div class="dk-hydwrap">
+    <div class="dk-word" id="dkWord" role="img" aria-label="Günün kelimesi"></div>
     <div class="dk-hyd" id="dkHyd" role="progressbar" aria-label="Hidrasyon barı" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="dk-hyd-fill" id="dkHydFill"></div><span>💧 Hidrasyon</span></div>
     <div class="dk-chips" id="dkChips" aria-live="polite"></div>
   </div>
   <div class="dk-toasts" id="dkToasts" aria-live="polite"></div>
+  <button type="button" class="dk-boardbtn" id="dkBoardBtn" aria-label="Nano-Kaykay kullan (çift dokunuş veya E)" disabled>🛹<b>0</b></button>
+  <div class="dk-celebrate" id="dkCelebrate" hidden aria-hidden="true"><span>🎉 KELİME TAMAM! 🎉</span></div>
 
   <div class="dk-overlay" id="dkStart">
-    <div class="dk-card">
-      <div class="dk-card-emoji" aria-hidden="true">🩸🏃‍♂️💧</div>
+    <div class="dk-card dk-card--home">
       <h1>Damar Yolu Koşucusu</h1>
-      <p class="dk-lead">Nano-Koruyucu ile damar tünelinde koşun. Su damlalarını toplayın, hidrasyon barı dolunca <b>Turbo</b>!</p>
-      <div class="dk-controls">
-        <div><b>📱 Telefon</b><span>← → kaydır: şerit · ↑ kaydır: zıpla · ↓ kaydır: kay</span></div>
-        <div><b>⌨️ Klavye</b><span>← → / A D: şerit · ↑ / W / Boşluk: zıpla · ↓ / S: kay · P: duraklat</span></div>
+      <div class="dk-wallet">
+        <div><small>Damla Bankası</small><b>💧 <span id="dkBank">0</span></b></div>
+        <div><small>Kaykay</small><b>🛹 <span id="dkBoardStock">0</span></b></div>
+        <div><small>Skor Çarpanı</small><b id="dkMult">x1</b></div>
       </div>
-      <ul class="dk-legend">
-        <li><i style="--c:#f59e0b"></i><b>Kolesterol plağı</b> zıpla</li>
-        <li><i style="--c:#7c3aed"></i><b>Toksin kapısı</b> kay</li>
-        <li><i style="--c:#dc2626"></i><b>Virüs küresi</b> şerit değiştir</li>
-        <li><i style="--c:#fb923c"></i><b>C Kalkanı</b> 1 çarpma</li>
-        <li><i style="--c:#ef4444"></i><b>Fe Mıknatısı</b> 8 sn</li>
-        <li><i style="--c:#facc15"></i><b>D3 Güneşi</b> 7 sn uçuş</li>
-      </ul>
+      <section class="dk-sec" aria-labelledby="dkMisH">
+        <h2 class="dk-sec-h" id="dkMisH">🎯 Görevler <small>3'ü bitince çarpan +1</small></h2>
+        <ul class="dk-missions" id="dkMissions"></ul>
+      </section>
+      <section class="dk-sec" aria-labelledby="dkWordH">
+        <h2 class="dk-sec-h" id="dkWordH">🔤 Günün Biyo-Kelimesi <small>Altın harf kürelerini sırayla topla</small></h2>
+        <div class="dk-word dk-word--home" id="dkWordHome"></div>
+      </section>
+      <details class="dk-help">
+        <summary>Kontroller ve parkur</summary>
+        <div class="dk-controls">
+          <div><b>📱 Telefon</b><span>← → kaydır: şerit · ↑ zıpla · ↓ kay · <em>çift dokun: kaykay</em></span></div>
+          <div><b>⌨️ Klavye / fare</b><span>← → / A D: şerit · ↑ / W / Boşluk: zıpla · ↓ / S: kay · E veya çift tık: kaykay · P: duraklat</span></div>
+        </div>
+        <ul class="dk-legend">
+          <li><i style="--c:#f59e0b"></i><b>Plak</b> zıpla</li>
+          <li><i style="--c:#7c3aed"></i><b>Toksin kapısı</b> kay</li>
+          <li><i style="--c:#dc2626"></i><b>Virüs</b> şerit değiştir</li>
+          <li><i style="--c:#f97316"></i><b>Dev kapsül</b> rampadan çatıya çık</li>
+          <li><i style="--c:#facc15"></i><b>D3 Jet-Pack</b> 10 sn uçuş</li>
+          <li><i style="--c:#a855f7"></i><b>Mg Botları</b> 2× zıplama</li>
+          <li><i style="--c:#ef4444"></i><b>Fe Mıknatısı</b> damla çeker</li>
+          <li><i style="--c:#fde047"></i><b>Yan sürtme</b> toksin kovalar</li>
+        </ul>
+      </details>
       <p class="dk-loading" id="dkLoading">3D motor yükleniyor…</p>
-      <button type="button" class="vo-btn dk-play" id="dkPlay" disabled>▶ Koşmaya Başla</button>
+      <div class="dk-home-acts">
+        <button type="button" class="vo-btn dk-play" id="dkPlay" disabled>▶ Koşmaya Başla</button>
+        <button type="button" class="vo-btn vo-btn--ghost dk-shopbtn" id="dkShopBtn">🛒 VitaMağaza <span class="dk-badge" id="dkBoxBadge" hidden>0</span></button>
+      </div>
     </div>
   </div>
 
@@ -69,20 +91,47 @@
       <h2 id="dkOverTitle">Damar Tıkandı!</h2>
       <div class="dk-over-grid">
         <div><small>Mesafe</small><b id="dkOverDist">0 m</b></div>
-        <div><small>Su damlası</small><b id="dkOverDrops">0</b></div>
+        <div><small>Kazanılan damla</small><b id="dkOverDrops">+0</b></div>
         <div><small>Skor</small><b id="dkOverScore">0</b></div>
         <div><small>Rekor</small><b id="dkOverBest">0</b></div>
       </div>
+      <p class="dk-over-bank">Damla Bankası: 💧 <b id="dkOverBank">0</b></p>
       <p class="dk-over-note" id="dkOverNote"></p>
       <div class="vo-modal-actions">
         <button type="button" class="vo-btn" id="dkAgain">↻ Tekrar Koş</button>
-        <a class="vo-btn vo-btn--ghost" href="index.html">Oyunlar Menüsü</a>
+        <button type="button" class="vo-btn vo-btn--ghost" id="dkOverShop">🛒 VitaMağaza</button>
+        <button type="button" class="vo-btn vo-btn--ghost" id="dkMenuBtn">🏠 Ana Ekran</button>
       </div>
     </div>
   </div>
 
   <div class="dk-overlay" id="dkFatal" hidden>
     <div class="dk-card dk-card--small"><h2>Oyun başlatılamadı</h2><p></p><a class="vo-btn" href="index.html">Oyunlar Menüsü</a></div>
+  </div>
+
+  <div class="dk-store" id="dkStore" hidden role="dialog" aria-modal="true" aria-labelledby="dkStoreTitle">
+    <div class="dk-store-sheet">
+      <div class="dk-store-head">
+        <h2 id="dkStoreTitle">🛒 VitaMağaza</h2>
+        <span class="dk-store-bank">💧 <b id="dkStoreBank">0</b></span>
+        <button type="button" class="dk-icon" id="dkStoreClose" aria-label="Mağazayı kapat">✕</button>
+      </div>
+      <div class="dk-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="chars">🧍 Kostümler</button>
+        <button type="button" role="tab" data-tab="boards">🛹 Kaykaylar</button>
+        <button type="button" role="tab" data-tab="acc">✨ Aksesuarlar &amp; Koleksiyon</button>
+        <button type="button" role="tab" data-tab="box">💊 Gizemli Kapsül</button>
+      </div>
+      <div class="dk-store-body" id="dkStoreBody" role="tabpanel"></div>
+    </div>
+  </div>
+
+  <div class="dk-boxopen" id="dkBoxOpen" hidden role="dialog" aria-modal="true" aria-label="Gizemli Kapsül açılıyor">
+    <div class="dk-boxopen-in">
+      <div class="dk-box-cap" id="dkBoxCap" aria-hidden="true"><span>💊</span></div>
+      <div class="dk-box-result" id="dkBoxResult" hidden aria-live="polite"></div>
+      <button type="button" class="vo-btn" id="dkBoxOk" hidden>Harika!</button>
+    </div>
   </div>
 </div>
 

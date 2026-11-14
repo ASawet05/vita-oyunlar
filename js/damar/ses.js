@@ -53,6 +53,15 @@ export function createAudio(storageKey) {
     turbo() { tone(160, 0.6, "sawtooth", 0.05, 900); noise(0.6, 0.06, 400, "bandpass", 3000); },
     smash() { noise(0.18, 0.13, 1800); tone(240, 0.12, "square", 0.04, 120); },
     level() { [440, 554, 659, 880].forEach((f, i) => tone(f, 0.16, "triangle", 0.07, 0, i * 0.08)); },
-    crash() { noise(0.6, 0.22, 900, "lowpass", 120); tone(110, 0.5, "sawtooth", 0.08, 40); }
+    crash() { noise(0.6, 0.22, 900, "lowpass", 120); tone(110, 0.5, "sawtooth", 0.08, 40); },
+    board() { tone(220, 0.3, "sawtooth", 0.05, 880); tone(440, 0.25, "sine", 0.06, 1320, 0.05); },
+    boardBreak() { noise(0.4, 0.18, 2600, "highpass"); tone(900, 0.3, "triangle", 0.08, 160); },
+    graze() { noise(0.18, 0.12, 700); tone(160, 0.2, "square", 0.05, 90); },
+    chaser() { tone(70, 0.6, "sawtooth", 0.06, 55); tone(105, 0.6, "sawtooth", 0.04, 80, 0.1); },
+    letter() { [988, 1319, 1568].forEach((f, i) => tone(f, 0.12, "sine", 0.07, 0, i * 0.05)); },
+    word() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.22, "triangle", 0.08, 0, i * 0.09)); },
+    box() { tone(330, 0.5, "triangle", 0.06, 660); [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.3, "sine", 0.07, 0, 0.55 + i * 0.07)); noise(0.3, 0.1, 3000, "highpass"); },
+    buy() { tone(660, 0.08, "sine", 0.07); tone(990, 0.14, "sine", 0.07, 0, 0.07); },
+    mission() { [659, 784, 1047].forEach((f, i) => tone(f, 0.16, "triangle", 0.07, 0, i * 0.08)); }
   };
 }
