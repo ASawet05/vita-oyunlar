@@ -73,7 +73,11 @@ export function createObjects(THREE, scene) {
     capBand: M({ color: 0x0f172a, roughness: 0.4 }),
     roofGlow: M({ color: 0x99f6e4, emissive: 0x2dd4bf, emissiveIntensity: 0.9, transparent: true, opacity: 0.55 }),
     box: M({ color: 0x7c3aed, emissive: 0x6d28d9, emissiveIntensity: 0.8, roughness: 0.2, metalness: 0.3 }),
-    boxB: M({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.9, roughness: 0.2, metalness: 0.4 })
+    boxB: M({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.9, roughness: 0.2, metalness: 0.4 }),
+    charge: M({ color: 0x5eead4, emissive: 0x14b8a6, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.9 }),
+    chargeCore: M({ color: 0xffffff, emissive: 0xccfbf1, emissiveIntensity: 1.6 }),
+    head: new THREE.MeshBasicMaterial({ color: 0xfffbeb }),
+    warn: M({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 1.2 })
   };
   const G = {
     plaque: new THREE.BoxGeometry(1.95, 0.62, 0.9), bump: new THREE.SphereGeometry(0.28, 12, 8),
@@ -84,18 +88,21 @@ export function createObjects(THREE, scene) {
     jet: new THREE.CylinderGeometry(0.14, 0.17, 0.62, 14), flame: new THREE.ConeGeometry(0.12, 0.34, 10),
     boot: new THREE.BoxGeometry(0.26, 0.2, 0.46), spring: new THREE.TorusGeometry(0.1, 0.035, 6, 14),
     orb: new THREE.SphereGeometry(0.42, 22, 16), ring: new THREE.TorusGeometry(0.55, 0.045, 8, 32),
-    box: new THREE.CapsuleGeometry(0.32, 0.42, 6, 14), boxRing: new THREE.TorusGeometry(0.36, 0.06, 8, 24)
+    box: new THREE.CapsuleGeometry(0.32, 0.42, 6, 14), boxRing: new THREE.TorusGeometry(0.36, 0.06, 8, 24),
+    charge: new THREE.CapsuleGeometry(0.17, 0.34, 6, 12), chargeCore: new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), chargeRing: new THREE.TorusGeometry(0.32, 0.03, 6, 24),
+    head: new THREE.CircleGeometry(0.26, 16), warn: new THREE.BoxGeometry(1.7, 0.16, 0.06)
   };
   const fib = (n) => { const out = []; const g = Math.PI * (3 - Math.sqrt(5)); for (let i = 0; i < n; i++) { const y = 1 - (i / (n - 1)) * 2, r = Math.sqrt(1 - y * y), th = g * i; out.push(new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r)); } return out; };
   const SPIKES = fib(18);
   const letterTex = {};
   function letterTexture(ch) {
     if (letterTex[ch]) return letterTex[ch];
+    const big = ch.length > 1;
     const c = document.createElement("canvas"); c.width = c.height = 128;
     const x = c.getContext("2d");
-    const g = x.createRadialGradient(48, 44, 8, 64, 64, 64); g.addColorStop(0, "#fff7cc"); g.addColorStop(0.5, "#facc15"); g.addColorStop(1, "#a16207");
+    const g = x.createRadialGradient(48, 44, 8, 64, 64, 64); if (big) { g.addColorStop(0, "#f5d0fe"); g.addColorStop(0.5, "#a855f7"); g.addColorStop(1, "#581c87"); } else { g.addColorStop(0, "#fff7cc"); g.addColorStop(0.5, "#facc15"); g.addColorStop(1, "#a16207"); }
     x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-    x.font = "900 78px system-ui,-apple-system,'Segoe UI',sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
+    x.font = (big ? "900 60px" : "900 78px") + " system-ui,-apple-system,'Segoe UI',sans-serif"; x.textAlign = "center"; x.textBaseline = "middle";
     x.lineWidth = 8; x.strokeStyle = "#713f12"; x.strokeText(ch, 64, 70); x.fillStyle = "#ffffff"; x.fillText(ch, 64, 70);
     const t = new THREE.CanvasTexture(c); letterTex[ch] = t; return t;
   }
@@ -123,6 +130,11 @@ export function createObjects(THREE, scene) {
       const capR = m(new THREE.SphereGeometry(CAPSULE.r, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), mats.capB, 0, CAPSULE.r + 0.1, -half); capR.rotation.x = -Math.PI / 2;
       const band = m(new THREE.CylinderGeometry(CAPSULE.r + 0.03, CAPSULE.r + 0.03, 0.18, 24), mats.capBand, 0, CAPSULE.r + 0.1, 0); band.rotation.x = Math.PI / 2;
       m(new THREE.BoxGeometry(0.5, 0.04, body * 0.92), mats.roofGlow, 0, CAPSULE.top + 0.01, 0);   // çatı koşu şeridi
+      if (opts.vz) {
+        // Hareketli tren: ön farlar + kırmızı uyarı bandı (karşıdan hızla gelir)
+        [-0.5, 0.5].forEach(x => m(G.head, mats.head, x, CAPSULE.r + 0.35, len / 2 + 0.02));
+        m(G.warn, mats.warn, 0, CAPSULE.r - 0.35, len / 2 - 0.25);
+      }
       if (opts.ramp) {
         const rl = CAPSULE.rampLen, ang = Math.atan2(CAPSULE.top, rl), hyp = Math.hypot(CAPSULE.top, rl);
         const ramp = m(new THREE.BoxGeometry(1.9, 0.14, hyp), mats.ramp, 0, CAPSULE.top / 2, len / 2 + rl / 2 - 0.2);
@@ -145,6 +157,12 @@ export function createObjects(THREE, scene) {
     } else if (type === "letter") {
       const mat = new THREE.MeshStandardMaterial({ map: letterTexture(opts.ch), emissive: 0xca8a04, emissiveIntensity: 0.55, roughness: 0.25, metalness: 0.35 });
       m(G.orb, mat); m(G.ring, mats.gold).rotation.x = Math.PI / 2;
+    } else if (type === "charge") {
+      m(G.charge, mats.charge); m(G.chargeCore, mats.chargeCore);
+      m(G.chargeRing, mats.charge).rotation.x = Math.PI / 2;
+    } else if (type === "x2") {
+      const mat = new THREE.MeshStandardMaterial({ map: letterTexture("x2"), emissive: 0x7e22ce, emissiveIntensity: 0.5, roughness: 0.25, metalness: 0.35 });
+      m(G.orb, mat); m(G.ring, mats.purple).rotation.x = Math.PI / 2;
     } else if (type === "box") {
       const b = m(G.box, mats.box); b.rotation.z = Math.PI / 2;
       m(G.boxRing, mats.boxB).rotation.y = Math.PI / 2;
@@ -171,7 +189,7 @@ export function createObjects(THREE, scene) {
   function clear() { list.splice(0).forEach(o => { if (o.alive) { o.alive = false; give(o); } }); }
 
   /* Parçacıklar (tek Points) */
-  const PMAX = 320, pPos = new Float32Array(PMAX * 3), pCol = new Float32Array(PMAX * 3), parts = [];
+  const PMAX = 520, pPos = new Float32Array(PMAX * 3), pCol = new Float32Array(PMAX * 3), parts = [];
   const pGeo = new THREE.BufferGeometry();
   pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute("color", new THREE.BufferAttribute(pCol, 3));
   const points = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));

@@ -107,6 +107,17 @@ export function createRunner(THREE) {
   // Turbo izi
   const trail = new THREE.Mesh(new THREE.ConeGeometry(0.55, 3.2, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide }));
   trail.rotation.x = -Math.PI / 2; trail.position.set(0, 1.1, 2.0); trail.visible = false; root.add(trail);
+  // Kaykay neon izi (ayakların altından geriye uzanan parlak şerit)
+  const boardTrailMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const boardTrail = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 4.2), boardTrailMat);
+  boardTrail.rotation.x = -Math.PI / 2; boardTrail.position.set(0, 0.06, 2.3); boardTrail.visible = false; root.add(boardTrail);
+  // Sersemleme yıldızları (başın üstünde dönen sarı yıldızlar)
+  const starShape = new THREE.Shape();
+  for (let i = 0; i < 10; i++) { const r = i % 2 ? 0.055 : 0.13, a = i / 10 * Math.PI * 2 - Math.PI / 2; i ? starShape.lineTo(Math.cos(a) * r, Math.sin(a) * r) : starShape.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+  const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.04, bevelEnabled: false }); starGeo.center();
+  const starMat = new THREE.MeshStandardMaterial({ color: 0xfde047, emissive: 0xfacc15, emissiveIntensity: 1.3, metalness: 0.3, roughness: 0.3 });
+  const stars = new THREE.Group(); stars.position.set(0, 2.42, 0); stars.visible = false; body.add(stars);
+  for (let i = 0; i < 5; i++) { const st = new THREE.Mesh(starGeo, starMat); const a = i / 5 * Math.PI * 2; st.position.set(Math.cos(a) * 0.42, 0, Math.sin(a) * 0.42); stars.add(st); }
 
   let skin = SKINS.nano, acc = { visor: false, cape: false, wings: false }, boardType = "plazma";
   function setSkin(id) {
@@ -157,6 +168,10 @@ export function createRunner(THREE) {
       water.emissiveIntensity = 1.1 + (s.hydration >= 100 || s.turbo ? Math.sin(t * 18) * 0.6 + 0.6 : 0);
       shield.visible = !!s.shield; if (s.shield) shield.scale.setScalar(1 + Math.sin(t * 5) * 0.04);
       trail.visible = !!s.turbo; if (s.turbo) trail.material.opacity = 0.18 + Math.random() * 0.15;
+      boardTrail.visible = onBoard && !s.crashed;
+      if (boardTrail.visible) { boardTrailMat.color.setHex(boardType === "magnezyum" ? 0xc084fc : 0x2dd4bf); boardTrailMat.opacity = 0.35 + Math.sin(t * 14) * 0.12; }
+      stars.visible = s.stunned > 0;
+      if (stars.visible) { stars.rotation.y += dt * 4.5; stars.scale.setScalar(Math.min(1, s.stunned)); stars.children.forEach((c, i) => { c.rotation.y += dt * 7; c.position.y = Math.sin(t * 6 + i * 1.3) * 0.05; }); }
       accent.emissiveIntensity = s.turbo ? 0.9 + Math.sin(t * 20) * 0.3 : 0.15;
       // Kaykay
       board.visible = onBoard; if (onBoard) { boardGlow.material.opacity = 0.25 + Math.sin(t * 8) * 0.12; board.position.y = 0.02 + Math.sin(t * 6) * 0.03; }

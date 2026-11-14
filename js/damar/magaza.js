@@ -1,6 +1,6 @@
 /* VitaMağaza, ana menü panelleri (banka, görevler, günlük kelime) ve Gizemli Kapsül açılışı — DOM arayüzü.
    Satın alma / seçim değişince onChange() ile 3D karakter anında güncellenir (mağaza alt pencere; karakter arkada görünür). */
-import { CHARACTERS, BOARDS, ACCESSORIES, PRICES, saveProfile, missionText, rollBox } from "./kayit.js";
+import { CHARACTERS, BOARDS, ACCESSORIES, PRICES, UPGRADES, UPG_PRICES, UPG_MAX, upgDuration, saveProfile, missionText, rollBox } from "./kayit.js";
 
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -52,11 +52,18 @@ export function createMenu({ getProfile, sfx, onChange, toast }) {
         return card({ id, kind: "char", title: c.name, desc: c.desc, swatch: sw(c.swatch[0], c.swatch[1]), state: sel ? "selected" : "", action });
       }).join("");
     } else if (tab === "boards") {
-      html = card({ id: "stock", kind: "stock", title: "Nano-Kaykay (tüketilebilir)", desc: "Çift dokun / çift tık / E: 15 sn kaykay. Çarpmada engeli parçalayıp seni kurtarır.", swatch: `<span class="dk-emoji">🛹</span>`, extra: `<em class="dk-have">Stok: ${p.boards}</em>`, action: `<button type="button" class="dk-btn dk-btn--buy" data-act="buy-board" ${p.bank < PRICES.board ? "disabled" : ""}>${price(PRICES.board)}</button>` });
+      html = card({ id: "stock", kind: "stock", title: "Nano-Kaykay (tüketilebilir)", desc: "Stoktaki kaykay: çift dokun / çift tık / Boşluk / E ile 15 sn. Önden çarpmada engeli parçalayıp seni kurtarır.", swatch: `<span class="dk-emoji">🛹</span>`, extra: `<em class="dk-have">Stok: ${p.boards}</em>`, action: `<button type="button" class="dk-btn dk-btn--buy" data-act="buy-board" ${p.bank < PRICES.board ? "disabled" : ""}>${price(PRICES.board)}</button>` });
       html += Object.entries(BOARDS).map(([id, b]) => {
         const owned = p.owned.boards.includes(id), sel = p.sel.board === id;
         const action = sel ? `<span class="dk-tag">Seçili</span>` : owned ? `<button type="button" class="dk-btn" data-act="select-board">Seç</button>` : `<button type="button" class="dk-btn dk-btn--buy" data-act="buy-model" ${p.bank < b.price ? "disabled" : ""}>${price(b.price)}</button>`;
         return card({ id, kind: "model", title: b.name, desc: b.desc, swatch: sw(id === "magnezyum" ? "#a855f7" : "#2dd4bf", id === "magnezyum" ? "#6d28d9" : "#0f766e"), state: sel ? "selected" : "", action });
+      }).join("");
+    } else if (tab === "upg") {
+      html = Object.entries(UPGRADES).map(([id, u]) => {
+        const lv = p.upg[id] || 0, max = lv >= UPG_MAX, cost = UPG_PRICES[lv];
+        const pips = Array.from({ length: UPG_MAX }, (_, i) => `<i class="${i < lv ? "is-on" : ""}"></i>`).join("");
+        const action = max ? `<span class="dk-tag">MAKS</span>` : `<button type="button" class="dk-btn dk-btn--buy" data-act="buy-upg" ${p.bank < cost ? "disabled" : ""}>${price(cost)}</button>`;
+        return card({ id, kind: "upg", title: u.name, desc: u.desc, swatch: `<span class="dk-emoji">${u.icon}</span>`, extra: `<span class="dk-pips" aria-label="Seviye ${lv}/${UPG_MAX}">${pips}</span><em class="dk-have">Süre: ${upgDuration(p, id)} sn${max ? "" : ` → ${upgDuration(p, id) + 2} sn`}</em>`, action });
       }).join("");
     } else if (tab === "acc") {
       html = Object.entries(ACCESSORIES).map(([id, a]) => {
@@ -94,6 +101,7 @@ export function createMenu({ getProfile, sfx, onChange, toast }) {
     else if (act === "buy-model") { if (!spend(BOARDS[id].price)) return; p.owned.boards.push(id); p.sel.board = id; toast(`${BOARDS[id].name} açıldı!`, "turbo"); }
     else if (act === "toggle-acc") { p.sel.acc[id] = !p.sel.acc[id]; sfx.lane(); }
     else if (act === "buy-acc") { if (!spend(ACCESSORIES[id].price)) return; p.owned.acc.push(id); p.sel.acc[id] = true; toast(`${ACCESSORIES[id].name} takıldı!`, "turbo"); }
+    else if (act === "buy-upg") { const lv = p.upg[id] || 0; if (lv >= UPG_MAX || !spend(UPG_PRICES[lv])) return; p.upg[id] = lv + 1; toast(`${UPGRADES[id].name}: ${upgDuration(p, id)} sn`, "turbo"); }
     else if (act === "buy-box") { if (!spend(PRICES.box)) return; p.boxes += 1; }
     else if (act === "open-box") { openBox(); return; }
     persist();

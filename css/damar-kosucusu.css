@@ -206,3 +206,30 @@ html,body.dk-body{height:100%;overflow:hidden;overscroll-behavior:none}
 @media (prefers-reduced-motion:reduce){.dk-box-cap.is-shaking span,.dk-boxshop-ico,.dk-wl.is-next,.dk-chip--chase{animation:none}}
 .dk-card .dk-shopbtn,.dk-card #dkOverShop,.dk-card #dkMenuBtn{background:rgba(2,6,23,.6);color:#e2e8f0;border:1px solid rgba(45,212,191,.5)}
 .dk-card .dk-shopbtn{background:linear-gradient(135deg,rgba(147,51,234,.45),rgba(8,145,178,.4));border-color:#c084fc;color:#fff}
+
+/* ---------- Sağ üst: Nano-Kaykay şarj silüeti ---------- */
+.dk-hyd{display:none}
+.dk-hydwrap{left:64px;right:64px}
+.dk-charge{position:absolute;top:8px;right:10px;z-index:5;display:flex;flex-direction:column;align-items:center;gap:2px;width:48px;padding:5px 4px 6px;border-radius:16px;border:1px solid rgba(45,212,191,.45);background:rgba(2,6,23,.7);color:#fff;cursor:pointer;--fill:0}
+.dk-charge:disabled{cursor:default}
+.dk-charge-board{display:block;width:26px;height:78px;transform:rotate(-8deg)}
+.dk-charge-board svg{display:block;width:100%;height:100%;overflow:visible}
+.dk-charge-shell{fill:rgba(15,23,42,.9);stroke:#5eead4;stroke-width:2.5}
+.dk-charge-fill{fill:#2dd4bf;transform-origin:0 120px;transform:scaleY(var(--fill));transition:transform .25s ease}
+.dk-charge-line{fill:none;stroke:rgba(255,255,255,.45);stroke-width:2;stroke-linecap:round}
+.dk-charge-wheel{fill:#0f172a;stroke:#5eead4;stroke-width:1.5}
+.dk-charge em{font-style:normal;font-size:10.5px;font-weight:900;color:#5eead4;font-variant-numeric:tabular-nums}
+.dk-charge b{position:absolute;top:-6px;left:-6px;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:#0f766e;border:1px solid #5eead4;font-size:11px;line-height:18px;text-align:center}
+.dk-charge.is-full .dk-charge-fill{fill:#fde047}
+.dk-charge.is-ready{border-color:#fde047;box-shadow:0 0 18px rgba(250,204,21,.65);animation:dk-ready 1s ease-in-out infinite alternate}
+.dk-charge.is-ready em{color:#fde047}
+.dk-charge.is-on{border-color:#a855f7;box-shadow:0 0 18px rgba(168,85,247,.8)}
+.dk-charge.is-on .dk-charge-fill{fill:#c084fc}
+.dk-charge:focus-visible{outline:3px solid #fde047;outline-offset:2px}
+@keyframes dk-ready{to{transform:scale(1.06)}}
+.dk-chip--x2{border-color:#c084fc;color:#f3e8ff}
+.dk-pips{display:flex;gap:3px;margin-top:4px}
+.dk-pips i{width:14px;height:6px;border-radius:3px;background:rgba(148,163,184,.3)}
+.dk-pips i.is-on{background:linear-gradient(90deg,#2dd4bf,#fde047)}
+@media (prefers-reduced-motion:reduce){.dk-charge.is-ready{animation:none}}
+.dk-toasts{left:62px;right:62px}.dk-toast{max-width:100%}

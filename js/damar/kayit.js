@@ -20,6 +20,16 @@ export const ACCESSORIES = {
   wings: { name: "Oksijen Jet Kanatları", price: 600, desc: "Sırt tüpünün yanında enerji kanatları" }
 };
 export const PRICES = { board: 30, box: 100 };
+/* Güçlendirici süre yükseltmeleri: her seviye +2 sn (taban 10 sn, en fazla 5 seviye = 20 sn) */
+export const UPGRADES = {
+  jet: { name: "D3 Jet-Pack", icon: "🚀", desc: "Tavana yakın uçuş, havada damla dizileri" },
+  boots: { name: "Mg Zıplama Botu", icon: "🥾", desc: "2× zıplama; yerden tren çatısına" },
+  magnet: { name: "Fe Mıknatısı", icon: "🧲", desc: "Zemindeki ve çatıdaki damlaları çeker" },
+  x2: { name: "2x Skor Çarpanı", icon: "✖️", desc: "Aktifken kazanılan skor iki katı" }
+};
+export const UPG_PRICES = [200, 400, 700, 1100, 1600];
+export const UPG_MAX = UPG_PRICES.length;
+export function upgDuration(p, k) { return 10 + 2 * Math.min(UPG_MAX, (p.upg && p.upg[k]) || 0); }
 export const WORDS = ["VİTAMİN", "SAĞLIK", "OKSİJEN", "ENERJİ", "BAĞIŞIKLIK", "MAGNEZYUM", "DEMİR"];
 
 /* Görev şablonları: kademe (tier) arttıkça hedefler büyür. scope "run" = tek koşuda */
@@ -48,7 +58,7 @@ export function missionText(m) { const t = MISSIONS.find(x => x.id === m.id); re
 
 function defaults() {
   return {
-    v: 1, bank: 0, boards: 2, boxes: 0, dna: 0, multiplier: 1, setNo: 0,
+    v: 1, bank: 0, boards: 2, upg: { jet: 0, boots: 0, magnet: 0, x2: 0 }, boxes: 0, dna: 0, multiplier: 1, setNo: 0,
     owned: { chars: ["nano"], boards: ["plazma"], acc: [] },
     sel: { char: "nano", board: "plazma", acc: { visor: false, cape: false, wings: false } },
     missions: missionSet(0), word: { day: today(), word: wordOfDay(), got: 0, done: false },
@@ -63,6 +73,7 @@ export function loadProfile() {
   // Eksik alanları tamamla (ileriye dönük uyumluluk)
   p = Object.assign({}, d, p);
   p.owned = Object.assign({}, d.owned, p.owned || {});
+  p.upg = Object.assign({}, d.upg, p.upg || {}); Object.keys(p.upg).forEach(k => { p.upg[k] = Math.max(0, Math.min(UPG_MAX, Math.floor(Number(p.upg[k]) || 0))); });
   p.sel = Object.assign({}, d.sel, p.sel || {}); p.sel.acc = Object.assign({}, d.sel.acc, (p.sel && p.sel.acc) || {});
   if (!Array.isArray(p.missions) || p.missions.length !== 3) p.missions = missionSet(p.setNo || 0);
   ["bank", "boards", "boxes", "dna", "multiplier", "setNo"].forEach(k => { p[k] = Math.max(k === "multiplier" ? 1 : 0, Math.floor(Number(p[k]) || 0)); });

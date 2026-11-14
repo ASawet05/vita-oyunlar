@@ -16,7 +16,7 @@ vucut-savunmasi.html Vücut Savunması (strateji) → css/vucut-savunmasi.css, j
 ```
 
 Damar Yolu Koşucusu, Three.js r160'ı jsDelivr CDN'inden (sabit sürüm) yükler; diğer oyunlar tamamen bağımsızdır.
-Damar Yolu Koşucusu ilerlemesi (damla bankası, VitaMağaza alımları, görevler/çarpan, günlük kelime, Gizemli Kapsül, Altın DNA) yalnızca bu cihazda localStorage'da `vo_damar_profile_v1` anahtarıyla saklanır (js/damar/kayit.js); mağaza arayüzü js/damar/magaza.js.
+Damar Yolu Koşucusu: su damlaları yalnızca para birimidir; turkuaz enerji kapsülleri kaykay şarjını doldurur. İlerleme (damla bankası, VitaMağaza alımları, güçlendirici yükseltmeleri, görevler/çarpan, günlük kelime, Gizemli Kapsül, Altın DNA) yalnızca bu cihazda localStorage'da `vo_damar_profile_v1` anahtarıyla saklanır (js/damar/kayit.js); mağaza arayüzü js/damar/magaza.js.
 
 ```
 ```
