@@ -82,3 +82,90 @@ html,body.vs-body{height:100%;overflow:hidden;overscroll-behavior:none}
 /* Mobil üst bar: etiketler kutularına sığar */
 .vs-stat small,.vs-stat b{overflow:hidden;text-overflow:ellipsis}
 @media (max-width:420px){.vs-back{padding:0 9px;font-size:12.5px}.vs-stat{padding:2px 4px;min-width:0}.vs-stat small{font-size:8px;letter-spacing:0}.vs-icon{width:33px;height:33px;font-size:14px}.vs-btns{gap:4px}}
+
+/* ================= Modern arayüz: cam (glassmorphism) HUD, kartlar, yükselt/sat kartı ================= */
+.vs-bar{background:rgba(15,23,42,.55);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3);border-bottom:1px solid rgba(255,255,255,.08)}
+.vs-stats{gap:5px}
+.vs-stat{display:flex;align-items:center;gap:5px;padding:3px 9px 3px 6px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 18px -10px rgba(0,0,0,.7);text-align:left;transition:transform .2s ease}
+.vs-stat i{font-style:normal;font-size:14px;line-height:1}
+.vs-stat span{display:flex;flex-direction:column;min-width:0}
+.vs-stat small{font-size:8.5px;color:#94a3b8}
+.vs-stat b{font-size:15px}
+.vs-stat--atp{border-color:rgba(253,224,71,.4);background:rgba(250,204,21,.08)}.vs-stat--atp b{color:#fef08a}
+.vs-stat--life{border-color:rgba(251,113,133,.4);background:rgba(244,63,94,.08)}.vs-stat--life small{color:#fda4af}
+.vs-stat--score b{color:#a5f3fc}.vs-stat--score small{color:#67e8f9}
+.vs-stat--wave small{color:#5eead4}
+.vs-stat.is-up{animation:vs-up .45s ease}
+.vs-stat.is-down{animation:vs-down .45s ease}
+.vs-stat--atp.is-up b{color:#bbf7d0}
+.vs-stat.is-down b{color:#fca5a5}
+@keyframes vs-up{0%{transform:scale(1)}35%{transform:scale(1.14);box-shadow:0 0 18px rgba(74,222,128,.55)}100%{transform:scale(1)}}
+@keyframes vs-down{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px) scale(1.06);box-shadow:0 0 18px rgba(248,113,113,.6)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(1px)}}
+/* Hız kontrolü: ⏸ | 1x | 2x bölmeli cam düğme grubu */
+.vs-seg{display:flex;padding:2px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
+.vs-seg-btn{min-width:34px;height:32px;padding:0 6px;border:0;border-radius:9px;background:transparent;color:#cbd5e1;font-size:13px;font-weight:900;cursor:pointer}
+.vs-seg-btn[aria-pressed="true"]{background:linear-gradient(180deg,#14b8a6,#0d9488);color:#fff;box-shadow:0 4px 14px -6px rgba(45,212,191,.8)}
+.vs-seg-btn#vsPauseBtn[aria-pressed="true"]{background:linear-gradient(180deg,#f59e0b,#d97706)}
+.vs-seg-btn:disabled{opacity:.4;cursor:default}
+.vs-seg-btn:focus-visible{outline:3px solid #5eead4;outline-offset:1px}
+.vs-icon{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.14)}
+
+/* Hücre seçim kartları */
+.vs-panel{background:rgba(2,6,23,.35);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.vs-card{width:78px;height:74px;justify-content:flex-start;padding:3px 3px 4px;gap:0;border-radius:14px;background:linear-gradient(180deg,rgba(30,41,59,.75),rgba(15,23,42,.85));border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.06);transition:transform .15s ease,border-color .15s ease,filter .2s}
+.vs-card .vs-ico{width:30px;height:30px;margin-top:1px}
+.vs-card .vs-cost{position:absolute;top:3px;right:4px;padding:1px 5px;border-radius:999px;background:rgba(2,6,23,.65);border:1px solid rgba(253,224,71,.4);font-size:10.5px}
+.vs-card .vs-name{font-size:9.5px;margin-top:1px}
+.vs-stats-mini{display:flex;gap:4px;margin-top:2px;font-size:8.5px;font-weight:900;color:#94a3b8;white-space:nowrap}
+.vs-stats-mini i{font-style:normal}
+.vs-need{position:absolute;left:3px;top:3px;font-size:9px;font-weight:900;color:#fca5a5;line-height:1}
+.vs-card.is-sel{transform:translateY(-2px)}
+.vs-card.is-poor{filter:grayscale(.75) brightness(.8);border-color:rgba(248,113,113,.45)}
+.vs-card.is-poor .vs-ico,.vs-card.is-poor .vs-cost{opacity:1}
+.vs-card.is-poor .vs-cost{color:#fca5a5;border-color:rgba(248,113,113,.6)}
+.vs-card.is-poor::after{content:"🔒";position:absolute;left:50%;top:9px;transform:translateX(-50%);font-size:12px;opacity:.95;text-shadow:0 1px 3px rgba(0,0,0,.8)}
+.vs-card.is-cool .vs-need{color:#cbd5e1}
+.vs-card.is-shake{animation:vs-shake .4s ease}
+@keyframes vs-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(2px)}}
+.vs-recycle{width:68px}
+
+/* Yükselt / Sat kartı */
+.vs-pop{position:absolute;z-index:5;width:232px;padding:10px;border-radius:16px;background:rgba(15,23,42,.82);border:1px solid rgba(94,234,212,.35);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 18px 40px -16px rgba(0,0,0,.9),0 0 26px -12px rgba(45,212,191,.7);color:#e2e8f0;animation:vs-pop-in .16s ease}
+.vs-pop[hidden]{display:none}
+@keyframes vs-pop-in{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
+.vs-pop-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.vs-pop-head canvas{width:44px;height:44px;flex:0 0 auto}
+.vs-pop-head > div{flex:1;min-width:0}
+.vs-pop-head b{display:block;font-size:14px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vs-pop-lvl{display:flex;align-items:center;gap:3px;margin-top:2px}
+.vs-pop-lvl i{width:16px;height:5px;border-radius:3px;background:rgba(148,163,184,.3)}
+.vs-pop-lvl i.on{background:linear-gradient(90deg,#fde047,#f59e0b)}
+.vs-pop-lvl span{margin-left:4px;font-size:10.5px;font-weight:800;color:#fcd34d}
+.vs-pop-x{width:28px;height:28px;border-radius:9px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#cbd5e1;font-size:13px;cursor:pointer}
+.vs-pop-stats{display:grid;gap:3px;margin-bottom:8px}
+.vs-pop-row{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:6px;padding:3px 6px;border-radius:8px;background:rgba(255,255,255,.04);font-size:11.5px}
+.vs-pop-ico{text-align:center}
+.vs-pop-row b{font-weight:900;color:#f8fafc;font-variant-numeric:tabular-nums}
+.vs-pop-row em{font-style:normal;color:#86efac}
+.vs-pop-acts{display:grid;grid-template-columns:1.25fr 1fr;gap:6px}
+.vs-pbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:42px;padding:4px 6px;border-radius:11px;border:1px solid rgba(255,255,255,.15);color:#fff;font-size:12px;font-weight:900;cursor:pointer;line-height:1.15}
+.vs-pbtn b{font-size:11px;font-weight:900;opacity:.95}
+.vs-pbtn small{font-size:9.5px;color:#fecaca}
+.vs-pbtn--up{background:linear-gradient(180deg,#22c55e,#15803d);border-color:#86efac}
+.vs-pbtn--up.is-poor{background:linear-gradient(180deg,#475569,#334155);border-color:rgba(248,113,113,.6)}
+.vs-pbtn--up:disabled{background:linear-gradient(180deg,#a16207,#713f12);border-color:#fde047;cursor:default;opacity:.95}
+.vs-pbtn--sell{background:rgba(13,148,136,.25);border-color:rgba(94,234,212,.55);color:#ccfbf1}
+.vs-pbtn.is-shake{animation:vs-shake .4s ease}
+.vs-pbtn:focus-visible,.vs-pop-x:focus-visible{outline:3px solid #fde047;outline-offset:2px}
+
+.vs-over-grid{grid-template-columns:repeat(4,1fr)}
+.vs-modal{background:rgba(15,23,42,.8);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.vs-toast{-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+
+/* Dar ekranlar: etiketleri gizle, ikon + sayı */
+@media (max-width:760px){.vs-stat--best{display:none}}
+@media (max-width:620px){.vs-stat small{display:none}.vs-stat{padding:3px 7px 3px 5px;gap:3px}.vs-stat i{font-size:12px}.vs-stat b{font-size:13.5px}.vs-over-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.vs-stat--life{display:flex}.vs-seg-btn{min-width:28px;height:30px;padding:0 4px;font-size:12px}.vs-card{width:66px;height:70px}.vs-card .vs-ico{width:26px;height:26px}.vs-card .vs-name{font-size:8.5px}.vs-stats-mini{font-size:8px;gap:2px}.vs-recycle{width:58px}}
+@media (max-width:420px){.vs-stats{gap:3px}.vs-stat{padding:2px 5px 2px 4px}.vs-stat i{font-size:11px}.vs-stat b{font-size:12.5px}.vs-btns{gap:3px}.vs-seg-btn{min-width:26px;font-size:11.5px}}
+@media (max-width:360px){.vs-stat--score{display:none}}
+@media (prefers-reduced-motion:reduce){.vs-stat.is-up,.vs-stat.is-down,.vs-card.is-shake,.vs-pop{animation:none}}
