@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vitamin Hafıza Eşleştirme · Vita Oyunlar</title>
+<meta name="description" content="Vitaminleri ve mineralleri en iyi besin kaynaklarıyla eşleştirdiğiniz hafıza oyunu.">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d9488'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/ortak.css">
+<link rel="stylesheet" href="css/oyun1.css">
+</head>
+<body>
+<header class="vo-bar">
+  <a class="vo-back" href="index.html" aria-label="Oyun listesine dön">← Oyunlar</a>
+  <a class="vo-back" href="https://vitatakip.com.tr" aria-label="VitaTakip uygulamasına geri dön">VitaTakip'e Dön</a>
+</header>
+
+<main class="vo-main">
+  <h1 class="vo-h1">🧩 Vitamin Hafıza Eşleştirme</h1>
+  <p class="vo-sub">Kartları ikişer ikişer çevirin. Her <b>vitamin / minerali</b>, en iyi kaynağı olan <b>besinle</b> eşleştirin.</p>
+
+  <div class="vo-panel mem-top">
+    <div class="mem-levels" role="radiogroup" aria-label="Zorluk">
+      <button type="button" class="mem-level" data-level="kolay" role="radio" aria-checked="false">Kolay · 6 çift</button>
+      <button type="button" class="mem-level is-on" data-level="normal" role="radio" aria-checked="true">Normal · 8 çift</button>
+      <button type="button" class="mem-level" data-level="zor" role="radio" aria-checked="false">Zor · 10 çift</button>
+    </div>
+    <div class="vo-stats">
+      <div class="vo-stat"><small>Hamle</small><b id="memMoves">0</b></div>
+      <div class="vo-stat"><small>Eşleşme</small><b id="memPairs">0/8</b></div>
+      <div class="vo-stat"><small>Süre</small><b id="memTime">0:00</b></div>
+      <div class="vo-stat"><small>En iyi</small><b id="memBest">—</b></div>
+    </div>
+  </div>
+
+  <div class="mem-fact" id="memFact" aria-live="polite">Bir vitamin kartı ile onun besin kartını bulun. 💡</div>
+
+  <div class="mem-grid" id="memGrid" aria-label="Kartlar"></div>
+
+  <div class="mem-actions"><button type="button" class="vo-btn vo-btn--ghost" id="memRestart">↻ Yeniden başlat</button></div>
+  <p class="vo-note">Bilgiler genel beslenme bilgisidir; tıbbi tavsiye değildir. Skorlar yalnızca bu cihazda saklanır.</p>
+</main>
+
+<div class="vo-modal" id="memDone" hidden role="dialog" aria-modal="true" aria-labelledby="memDoneTitle">
+  <div class="vo-modal-card">
+    <div class="vo-modal-emoji" aria-hidden="true">🏆</div>
+    <h2 id="memDoneTitle">Tebrikler!</h2>
+    <p id="memDoneText"></p>
+    <div class="vo-modal-actions">
+      <button type="button" class="vo-btn" id="memAgain">Tekrar oyna</button>
+      <a class="vo-btn vo-btn--ghost" href="index.html">Oyunlar</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/oyun1.js"></script>
+</body>
+</html>

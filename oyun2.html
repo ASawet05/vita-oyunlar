@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sağlıklı Sepet · Vita Oyunlar</title>
+<meta name="description" content="Düşen sağlıklı besinleri ve su damlalarını yakalayın, abur cuburdan kaçının.">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230d9488'/%3E%3Ctext x='32' y='44' font-size='34' text-anchor='middle'%3E%F0%9F%A7%BA%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/ortak.css">
+<link rel="stylesheet" href="css/oyun2.css">
+</head>
+<body>
+<header class="vo-bar">
+  <a class="vo-back" href="index.html" aria-label="Oyun listesine dön">← Oyunlar</a>
+  <a class="vo-back" href="https://vitatakip.com.tr" aria-label="VitaTakip uygulamasına geri dön">VitaTakip'e Dön</a>
+</header>
+
+<main class="vo-main">
+  <h1 class="vo-h1">🧺 Sağlıklı Sepet</h1>
+  <p class="vo-sub">Sepeti parmağınızla sürükleyin (veya ← → tuşları). <b>Sağlıklı besinleri</b> ve <b>su damlalarını</b> yakalayın, <b>abur cuburdan</b> kaçının. Su barı dolunca bonus!</p>
+
+  <div class="vo-stats sep-stats">
+    <div class="vo-stat"><small>Puan</small><b id="sepScore">0</b></div>
+    <div class="vo-stat"><small>Süre</small><b id="sepTime">60</b></div>
+    <div class="vo-stat"><small>Can</small><b id="sepLives" aria-label="3 can">❤️ 3</b></div>
+    <div class="vo-stat"><small>En iyi</small><b id="sepBest">—</b></div>
+  </div>
+  <div class="sep-water" aria-label="Su barı"><div class="sep-water-fill" id="sepWater"></div><span>💧 Su</span></div>
+
+  <div class="sep-stage" id="sepStage">
+    <canvas id="sepCanvas" aria-label="Oyun alanı" role="img"></canvas>
+    <div class="sep-overlay" id="sepStart">
+      <div class="sep-legend">
+        <div><b>+10</b> 🍎 🥦 🥕 🍌 🐟 🥚 🥜 🍊</div>
+        <div><b>+5</b> 💧 su (barı doldurur → <b>+50</b>)</div>
+        <div><b>−1 can</b> 🍩 🍟 🥤 🍬 🍔</div>
+      </div>
+      <button type="button" class="vo-btn" id="sepPlay">▶ Başla</button>
+    </div>
+    <button type="button" class="sep-pause" id="sepPause" aria-label="Duraklat" hidden>⏸</button>
+  </div>
+  <p class="sr-only" id="sepLive" aria-live="polite"></p>
+  <p class="vo-note">Oyun eğlence amaçlıdır. Günlük su ihtiyacınız yaşınıza, kilonuza ve etkinliğinize göre değişir. Skorlar yalnızca bu cihazda saklanır.</p>
+</main>
+
+<div class="vo-modal" id="sepDone" hidden role="dialog" aria-modal="true" aria-labelledby="sepDoneTitle">
+  <div class="vo-modal-card">
+    <div class="vo-modal-emoji" id="sepDoneEmoji" aria-hidden="true">🧺</div>
+    <h2 id="sepDoneTitle">Oyun bitti</h2>
+    <p id="sepDoneText"></p>
+    <div class="vo-modal-actions">
+      <button type="button" class="vo-btn" id="sepAgain">Tekrar oyna</button>
+      <a class="vo-btn vo-btn--ghost" href="index.html">Oyunlar</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/oyun2.js"></script>
+</body>
+</html>
