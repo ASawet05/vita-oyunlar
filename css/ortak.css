@@ -49,3 +49,7 @@ a{color:inherit}
 .vo-modal-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+
+/* Oyun üst barları: dar ekranda geri düğmesi "← Menü" olarak kısalır (tam adı aria-label'da) */
+.bk-short{display:none}
+@media (max-width:420px){.bk-long{display:none}.bk-short{display:inline}}

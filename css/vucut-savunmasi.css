@@ -79,3 +79,6 @@ html,body.vs-body{height:100%;overflow:hidden;overscroll-behavior:none}
   .vs-recycle .vs-name{white-space:normal;text-align:center}
   .vs-recycle-ico{font-size:18px;margin-top:2px}
 }
+/* Mobil üst bar: etiketler kutularına sığar */
+.vs-stat small,.vs-stat b{overflow:hidden;text-overflow:ellipsis}
+@media (max-width:420px){.vs-back{padding:0 9px;font-size:12.5px}.vs-stat{padding:2px 4px;min-width:0}.vs-stat small{font-size:8px;letter-spacing:0}.vs-icon{width:33px;height:33px;font-size:14px}.vs-btns{gap:4px}}

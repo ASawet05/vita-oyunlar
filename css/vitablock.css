@@ -79,3 +79,11 @@
 .vb-help .vb-note{text-align:center}
 .vb-confirm-text{margin:0 0 14px !important;color:#cbd5e1 !important;font-size:14px}
 @media (max-width:400px){.vb-bar{gap:5px;padding:8px}.vb-back{font-size:11.5px;padding:0 8px}.vb-score{min-width:48px;padding:3px 6px}.vb-score b{font-size:15px}.vb-sound{width:36px;height:36px;font-size:16px}.vb-tools{gap:4px}}
+/* Mobil üst bar: hiçbir öğe taşmaz (büyük yazı tipi ayarında da) */
+.vb-bar>*{min-width:0}
+.vb-scores{min-width:0;flex:1 1 auto;justify-content:center}
+.vb-score{min-width:0;flex:0 1 72px}
+.vb-score small,.vb-score b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vb-back,.vb-tools{flex:0 0 auto}
+@media (max-width:420px){.vb-bar{gap:4px;padding:8px 6px}.vb-back{padding:0 9px;font-size:13px}.vb-score{padding:3px 5px}.vb-sound{width:36px;height:36px;font-size:16px}.vb-tool{font-size:17px}.vb-tools{gap:4px}}
+@media (max-width:340px){.vb-score small{font-size:8.5px;letter-spacing:0}.vb-score b{font-size:14px}.vb-sound{width:33px;height:33px}}
