@@ -28,11 +28,12 @@
 
 <div class="dk-stage" id="dkStage">
   <canvas id="dkCanvas" aria-label="Damar Yolu Koşucusu 3D oyun alanı"></canvas>
-  <div class="dk-hydwrap">
+  <div class="dk-hydwrap dk-hud" aria-label="Kelime ve aktif etkiler">
     <div class="dk-word" id="dkWord" role="img" aria-label="Günün kelimesi"></div>
     <div class="dk-chips" id="dkChips" aria-live="polite"></div>
   </div>
   <div class="dk-toasts" id="dkToasts" aria-live="polite"></div>
+  <div class="dk-danger" id="dkDanger" hidden role="status"><i aria-hidden="true">!</i><span>Toksin arkanda!</span></div>
   <button type="button" class="dk-charge" id="dkBoardBtn" aria-label="Nano-Kaykay şarjı" disabled>
     <span class="dk-charge-board" aria-hidden="true"><svg viewBox="0 0 40 120"><defs><clipPath id="dkBoardClip"><path d="M20 4c9 0 14 6 14 14v84c0 8-5 14-14 14S6 110 6 102V18C6 10 11 4 20 4z"/></clipPath></defs><path class="dk-charge-shell" d="M20 4c9 0 14 6 14 14v84c0 8-5 14-14 14S6 110 6 102V18C6 10 11 4 20 4z"/><g clip-path="url(#dkBoardClip)"><rect class="dk-charge-fill" x="0" y="0" width="40" height="120"/></g><path class="dk-charge-line" d="M20 14v92M12 30h16M12 90h16"/><circle class="dk-charge-wheel" cx="8" cy="30" r="3"/><circle class="dk-charge-wheel" cx="32" cy="30" r="3"/><circle class="dk-charge-wheel" cx="8" cy="90" r="3"/><circle class="dk-charge-wheel" cx="32" cy="90" r="3"/></svg></span>
     <em>0%</em><b>0</b>
@@ -52,7 +53,7 @@
         <ul class="dk-missions" id="dkMissions"></ul>
       </section>
       <section class="dk-sec" aria-labelledby="dkWordH">
-        <h2 class="dk-sec-h" id="dkWordH">🔤 Günün Biyo-Kelimesi <small>Altın harf kürelerini sırayla topla</small></h2>
+        <h2 class="dk-sec-h" id="dkWordH">🔤 Günün Kelimesi <small>altın harf kürelerini topla</small></h2>
         <div class="dk-word dk-word--home" id="dkWordHome"></div>
       </section>
       <details class="dk-help">

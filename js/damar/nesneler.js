@@ -49,6 +49,65 @@ export function makeRowPattern(level, rand, prevPass, occupied = [false, false, 
   return { lanes: [null, null, null], moving: null, capsules: [], pass: free.length ? free : [0, 1, 2], free: free.length ? free : [0, 1, 2] };
 }
 
+import { mergeGeos } from "./birlestir.js";
+/* Yumuşak radyal parıltı dokusu (additive sprite için, tek sefer üretilir) */
+let glowTex = null;
+export function glowTexture(THREE) {
+  if (glowTex) return glowTex;
+  const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d");
+  const g = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.25, "rgba(255,255,255,.55)"); g.addColorStop(0.6, "rgba(255,255,255,.12)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  glowTex = new THREE.CanvasTexture(c); return glowTex;
+}
+/* Prosedürel mikrop/toksin organizması: yarı saydam zar, parlayan çekirdek, uçları topuzlu dikenler,
+   kıvrımlı dokunaçlar ve toksik hale. Dönüş: { group, core } — core nabız gibi ölçeklenir. */
+const micCache = {};
+export function buildMicrobe(THREE, { r = 0.55, membrane = 0x65a30d, glow = 0x84cc16, nucleus = 0x7e22ce, tip = 0xd946ef, spikes = 22, tentacles = 5, eyes = false } = {}) {
+  const key = [r, membrane, glow, nucleus, tip, spikes, tentacles].join("|");
+  const C = micCache[key] || (micCache[key] = (() => {
+    const fibDirs = []; const ga = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < spikes; i++) { const y = 1 - (i / (spikes - 1)) * 2, rr = Math.sqrt(1 - y * y), th = ga * i; fibDirs.push(new THREE.Vector3(Math.cos(th) * rr, y, Math.sin(th) * rr)); }
+    const tubes = [];
+    for (let i = 0; i < tentacles; i++) {
+      const a = (i / tentacles) * Math.PI * 2, pts = [];
+      for (let k = 0; k <= 5; k++) { const d = k / 5; pts.push(new THREE.Vector3(Math.cos(a) * r * (0.55 + d * 0.5) + Math.sin(d * 5 + i) * r * 0.18, -r * 0.6 - d * r * 1.5, Math.sin(a) * r * (0.55 + d * 0.5) + Math.cos(d * 4 + i) * r * 0.18)); }
+      tubes.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 12, r * 0.06, 5, false));
+    }
+    return {
+      fibDirs,
+      ...(() => {
+        const up = new THREE.Vector3(0, 1, 0), stalkGeo = new THREE.CylinderGeometry(r * 0.035, r * 0.06, r * 0.5, 6), tipGeo = new THREE.SphereGeometry(r * 0.1, 6, 4);
+        const mS = [], mT = [];
+        fibDirs.forEach(p => {
+          const q = new THREE.Quaternion().setFromUnitVectors(up, p);
+          mS.push({ geo: stalkGeo, matrix: new THREE.Matrix4().compose(p.clone().multiplyScalar(r * 1.18), q, new THREE.Vector3(1, 1, 1)) });
+          mT.push({ geo: tipGeo, matrix: new THREE.Matrix4().makeTranslation(p.x * r * 1.45, p.y * r * 1.45, p.z * r * 1.45) });
+        });
+        return { stalksGeo: mergeGeos(THREE, mS), tipsGeo: mergeGeos(THREE, mT), tenGeo: mergeGeos(THREE, tubes.map(g => ({ geo: g }))) };
+      })(),
+      memGeo: new THREE.IcosahedronGeometry(r, 3), nucGeo: new THREE.IcosahedronGeometry(r * 0.52, 2),
+      memMat: new THREE.MeshStandardMaterial({ color: membrane, emissive: glow, emissiveIntensity: 0.45, transparent: true, opacity: 0.55, roughness: 0.25, metalness: 0.1, depthWrite: false }),
+      nucMat: new THREE.MeshStandardMaterial({ color: nucleus, emissive: nucleus, emissiveIntensity: 0.9, roughness: 0.4, flatShading: true }),
+      stalkMat: new THREE.MeshStandardMaterial({ color: membrane, emissive: glow, emissiveIntensity: 0.35, roughness: 0.4 }),
+      tipMat: new THREE.MeshStandardMaterial({ color: tip, emissive: tip, emissiveIntensity: 1.3, roughness: 0.3 }),
+      tenMat: new THREE.MeshStandardMaterial({ color: membrane, emissive: glow, emissiveIntensity: 0.3, transparent: true, opacity: 0.8, roughness: 0.5 }),
+      haloMat: new THREE.SpriteMaterial({ map: glowTexture(THREE), color: glow, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })
+    };
+  })());
+  const group = new THREE.Group(), core = new THREE.Group(); group.add(core);
+  core.add(new THREE.Mesh(C.nucGeo, C.nucMat));
+  core.add(new THREE.Mesh(C.memGeo, C.memMat));
+  core.add(new THREE.Mesh(C.stalksGeo, C.stalkMat)); core.add(new THREE.Mesh(C.tipsGeo, C.tipMat));
+  group.add(new THREE.Mesh(C.tenGeo, C.tenMat));
+  const halo = new THREE.Sprite(C.haloMat); halo.scale.setScalar(r * 4.2); group.add(halo);
+  if (eyes) {
+    const eyeM = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+    [-0.32, 0.32].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(r * 0.14, 10, 8), eyeM); e.position.set(x * r, r * 0.2, -r * 0.92); group.add(e); });
+  }
+  return { group, core };
+}
+
 export function createObjects(THREE, scene) {
   const list = [];
   const M = (o) => new THREE.MeshStandardMaterial(o);
@@ -77,6 +136,8 @@ export function createObjects(THREE, scene) {
     charge: M({ color: 0x5eead4, emissive: 0x14b8a6, emissiveIntensity: 1.4, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.9 }),
     chargeCore: M({ color: 0xffffff, emissive: 0xccfbf1, emissiveIntensity: 1.6 }),
     head: new THREE.MeshBasicMaterial({ color: 0xfffbeb }),
+    curtain: M({ color: 0x84cc16, emissive: 0x65a30d, emissiveIntensity: 0.7, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false }),
+    gateHalo: new THREE.SpriteMaterial({ map: glowTexture(THREE), color: 0xa855f7, transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }),
     warn: M({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 1.2 })
   };
   const G = {
@@ -90,7 +151,7 @@ export function createObjects(THREE, scene) {
     orb: new THREE.SphereGeometry(0.42, 22, 16), ring: new THREE.TorusGeometry(0.55, 0.045, 8, 32),
     box: new THREE.CapsuleGeometry(0.32, 0.42, 6, 14), boxRing: new THREE.TorusGeometry(0.36, 0.06, 8, 24),
     charge: new THREE.CapsuleGeometry(0.17, 0.34, 6, 12), chargeCore: new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), chargeRing: new THREE.TorusGeometry(0.32, 0.03, 6, 24),
-    head: new THREE.CircleGeometry(0.26, 16), warn: new THREE.BoxGeometry(1.7, 0.16, 0.06)
+    head: new THREE.CircleGeometry(0.26, 16), curtain: new THREE.PlaneGeometry(1.9, 0.75, 8, 3), auraRing: new THREE.TorusGeometry(0.62, 0.018, 6, 40), auraRing2: new THREE.TorusGeometry(0.5, 0.014, 6, 36), warn: new THREE.BoxGeometry(1.7, 0.16, 0.06)
   };
   const fib = (n) => { const out = []; const g = Math.PI * (3 - Math.sqrt(5)); for (let i = 0; i < n; i++) { const y = 1 - (i / (n - 1)) * 2, r = Math.sqrt(1 - y * y), th = g * i; out.push(new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r)); } return out; };
   const SPIKES = fib(18);
@@ -117,9 +178,13 @@ export function createObjects(THREE, scene) {
       m(G.post, mats.post, -1.02, 1.2, 0); m(G.post, mats.post, 1.02, 1.2, 0); m(G.beam, mats.beam, 0, 1.85, 0);
       [-0.66, 0, 0.66].forEach(x => m(G.stripe, mats.stripe, x, 1.85, 0).rotation.z = 0.5);
       [-0.7, -0.2, 0.35, 0.8].forEach((x, i) => { const d = m(G.drip, mats.drip, x, 1.22 - (i % 2) * 0.08, 0.05); d.rotation.x = Math.PI; });
+      // Toksik zar perdesi (kirişin altından sarkan yarı saydam yeşil tabaka) + mor hale
+      m(G.curtain, mats.curtain, 0, 1.5, 0.02);
+      const hl = new THREE.Sprite(mats.gateHalo); hl.position.set(0, 1.85, 0.1); hl.scale.set(3.2, 1.6, 1); g.add(hl);
     } else if (type === "virus") {
-      const core = m(G.virus, mats.virus, 0, 1.0, 0);
-      SPIKES.forEach(p => { const s = new THREE.Mesh(G.spike, mats.spike); s.position.copy(p).multiplyScalar(0.72); s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p); core.add(s); });
+      // Prosedürel mikrop: children[0] = gövde grubu (döner), userData.core nabız gibi ölçeklenir
+      const mic = buildMicrobe(THREE, { r: 0.52 });
+      mic.group.position.y = 1.0; g.add(mic.group); g.userData.core = mic.core;
     } else if (type === "capsule") {
       // Dev Vitamin Kapsülü: iki renkli yatık kapsül (+ isteğe bağlı rampa). Gövde z ekseninde, uzunluk = len
       const len = opts.len, body = len - 2 * CAPSULE.r, half = body / 2;
@@ -168,8 +233,19 @@ export function createObjects(THREE, scene) {
       m(G.boxRing, mats.boxB).rotation.y = Math.PI / 2;
       m(G.ring, mats.boxB).rotation.x = Math.PI / 2;
     }
+    const AURA = { magnet: 0xef4444, jet: 0xfacc15, boots: 0xa855f7, letter: 0xfacc15, charge: 0x2dd4bf, x2: 0xc084fc, box: 0xa855f7 };
+    if (AURA[type]) {
+      const col = AURA[type], sm = type === "charge" ? 0.75 : 1;
+      const halo = new THREE.Sprite(auraSprite(col)); halo.scale.setScalar(1.9 * sm); g.add(halo);
+      const r1 = new THREE.Mesh(G.auraRing, auraRingMat(col)), r2 = new THREE.Mesh(G.auraRing2, auraRingMat(col));
+      r1.scale.setScalar(sm); r2.scale.setScalar(sm); r1.rotation.x = 1.1; r2.rotation.y = 1.2; g.add(r1); g.add(r2);
+      g.userData.rings = [r1, r2];
+    }
     return g;
   }
+  const auraSprites = {}, auraRings = {};
+  function auraSprite(col) { return auraSprites[col] || (auraSprites[col] = new THREE.SpriteMaterial({ map: glowTexture(THREE), color: col, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending })); }
+  function auraRingMat(col) { return auraRings[col] || (auraRings[col] = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending })); }
   // Havuz: kapsül/harf gibi parametreli nesneler havuzlanmaz
   const pool = {};
   const pooled = t => !["capsule", "letter"].includes(t);
@@ -177,7 +253,7 @@ export function createObjects(THREE, scene) {
   function give(o) {
     scene.remove(o.mesh);
     if (pooled(o.type)) (pool[o.type] || (pool[o.type] = [])).push(o.mesh);
-    else o.mesh.traverse(n => { if (n.geometry && !Object.values(G).includes(n.geometry)) n.geometry.dispose(); });
+    else o.mesh.traverse(n => { if (n.geometry && !n.isSprite && !Object.values(G).includes(n.geometry)) n.geometry.dispose(); });
   }
   function spawn(type, lane, z, y = 0, extra = {}) {
     const mesh = take(type, extra);
@@ -192,7 +268,7 @@ export function createObjects(THREE, scene) {
   const PMAX = 520, pPos = new Float32Array(PMAX * 3), pCol = new Float32Array(PMAX * 3), parts = [];
   const pGeo = new THREE.BufferGeometry();
   pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3)); pGeo.setAttribute("color", new THREE.BufferAttribute(pCol, 3));
-  const points = new THREE.Points(pGeo, new THREE.PointsMaterial({ size: 0.16, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));
+  const points = new THREE.Points(pGeo, new THREE.PointsMaterial({ map: glowTexture(THREE), size: 0.3, vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending }));
   points.frustumCulled = false; scene.add(points);
   const tmpC = new THREE.Color();
   function burst(x, y, z, color, n = 16, power = 1) {

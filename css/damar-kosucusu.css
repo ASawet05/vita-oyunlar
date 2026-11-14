@@ -233,3 +233,61 @@ html,body.dk-body{height:100%;overflow:hidden;overscroll-behavior:none}
 .dk-pips i.is-on{background:linear-gradient(90deg,#2dd4bf,#fde047)}
 @media (prefers-reduced-motion:reduce){.dk-charge.is-ready{animation:none}}
 .dk-toasts{left:62px;right:62px}.dk-toast{max-width:100%}
+
+/* ================= Modern arayüz (cam efekti, ferah oyun ekranı) ================= */
+/* Sol üst: kelime kutuları + aktif etkiler — kompakt, ikon tabanlı, yarı saydam cam şerit */
+.dk-hydwrap.dk-hud{left:8px;right:auto;top:8px;max-width:calc(100% - 82px);align-items:flex-start;gap:5px;padding:6px 7px;border-radius:14px;background:rgba(15,23,42,.32);border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px -12px rgba(0,0,0,.6);-webkit-backdrop-filter:blur(10px) saturate(1.3);backdrop-filter:blur(10px) saturate(1.3)}
+.dk-stage:not(.is-playing) .dk-hud,.dk-stage:not(.is-playing) .dk-charge{display:none}
+.dk-hud .dk-word{justify-content:flex-start;gap:2px}
+.dk-hud .dk-wl{width:15px;height:18px;border-radius:4px;font-size:10px;background:rgba(2,6,23,.45);border-color:rgba(255,255,255,.14)}
+.dk-hud .dk-wl.is-got{box-shadow:0 0 6px rgba(250,204,21,.5)}
+.dk-hud .dk-wdone{font-size:12px}
+.dk-hud .dk-chips{justify-content:flex-start;gap:4px}
+.dk-hud .dk-chip{display:inline-flex;align-items:center;gap:3px;min-height:20px;padding:1px 7px 1px 5px;border-radius:999px;font-size:11px;font-weight:900;font-variant-numeric:tabular-nums;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#e2e8f0}
+.dk-hud .dk-chip b{font-size:11px;line-height:1}
+.dk-hud .dk-chip--mult{color:#99f6e4;border-color:rgba(94,234,212,.45)}
+.dk-hud .dk-chip--x2{color:#f5d0fe;border-color:rgba(192,132,252,.6)}
+.dk-hud .dk-chip--x2 b{font-size:9.5px;padding:1px 3px;border-radius:5px;background:#a855f7;color:#fff}
+.dk-hud .dk-chip--chase{color:#fde047;border-color:rgba(250,204,21,.6);background:rgba(113,63,18,.35)}
+.dk-hud .dk-chip--board{color:#ccfbf1;border-color:rgba(45,212,191,.6)}
+.dk-hud .dk-chip--sun{color:#fef08a;border-color:rgba(250,204,21,.55)}
+.dk-hud .dk-chip--boots{color:#f3e8ff;border-color:rgba(192,132,252,.55)}
+.dk-hud .dk-chip--magnet{color:#fecaca;border-color:rgba(248,113,113,.55)}
+/* Şarj silüeti de cam görünümünde */
+.dk-charge{background:rgba(15,23,42,.38);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-color:rgba(94,234,212,.4)}
+/* Bildirimler: cam şeridin altında, ortada */
+.dk-toasts{top:84px;left:16px;right:72px}
+.dk-toast{font-size:13px;padding:7px 14px;box-shadow:0 10px 26px -10px rgba(0,0,0,.7)}
+
+/* Alt kenar tehlike göstergesi (karakterin görüşünü kapatmaz) */
+.dk-danger{position:absolute;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:7px;padding:4px 12px 4px 4px;border-radius:999px;background:rgba(69,10,10,.55);border:1px solid rgba(248,113,113,.6);color:#fecaca;font-size:11.5px;font-weight:900;white-space:nowrap;pointer-events:none;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 0 18px -4px rgba(239,68,68,.7);animation:dk-danger .8s ease-in-out infinite alternate}
+.dk-danger[hidden]{display:none}
+.dk-danger i{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#facc15;color:#7f1d1d;font-style:normal;font-weight:900;font-size:13px}
+@keyframes dk-danger{to{box-shadow:0 0 26px 0 rgba(239,68,68,.85);border-color:#f87171}}
+
+/* Ana menü: kompakt alt kart, arkada canlı 3D damar sahnesi görünür */
+#dkStart{align-items:flex-end;padding:10px 10px max(12px,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(2,6,23,0) 0%,rgba(2,6,23,0) 38%,rgba(2,6,23,.55) 70%,rgba(2,6,23,.85) 100%)}
+.dk-card.dk-card--home{width:min(420px,100%);max-height:62%;padding:12px 12px 10px;border-radius:20px;background:rgba(15,23,42,.62);border:1px solid rgba(94,234,212,.28);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 18px 50px -20px rgba(0,0,0,.9)}
+.dk-card--home h1{margin:0 0 6px;font-size:19px;letter-spacing:.01em;background:linear-gradient(90deg,#5eead4,#e2e8f0 60%,#f9a8d4);-webkit-background-clip:text;background-clip:text;color:transparent}
+.dk-card--home .dk-wallet{gap:5px;margin:0 0 8px}
+.dk-card--home .dk-wallet div{display:flex;align-items:center;justify-content:center;gap:6px;padding:5px 4px;border-radius:12px;background:rgba(2,6,23,.4)}
+.dk-card--home .dk-wallet small{font-size:8.5px;letter-spacing:.02em;max-width:52px;line-height:1.1;text-align:right}
+.dk-card--home .dk-wallet b{font-size:15px}
+.dk-card--home .dk-sec{margin:0 0 7px}
+.dk-card .dk-card--home .dk-sec-h,.dk-card--home .dk-sec-h{margin:0 0 4px;font-size:12px}
+.dk-card--home .dk-sec-h small{font-size:10px}
+/* Görevler: tek satır, 3 eşit kompakt kutu */
+.dk-card--home .dk-missions{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.dk-card--home .dk-mission{flex-direction:column;justify-content:center;gap:1px;padding:5px 7px 6px;border-radius:10px;font-size:10.5px;line-height:1.2;background:rgba(2,6,23,.45)}
+.dk-card--home .dk-mission span{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.dk-card--home .dk-mission b{font-size:10.5px}
+.dk-card--home .dk-word--home{justify-content:flex-start}
+.dk-card--home .dk-word--home .dk-wl{width:22px;height:25px;font-size:12.5px;border-radius:7px}
+.dk-card--home .dk-help{margin:0 0 7px;font-size:11.5px}
+.dk-card--home .dk-help summary{padding:2px 0}
+.dk-card--home .dk-loading{margin:0 0 6px}
+.dk-card--home .dk-play{min-height:46px;font-size:16px}
+.dk-card--home .dk-shopbtn{min-height:46px;font-size:13px}
+@media (max-height:700px){.dk-card.dk-card--home{max-height:70%}.dk-card--home .dk-word--home .dk-wl{width:19px;height:22px;font-size:11px}}
+@media (max-width:360px){.dk-card--home .dk-mission{font-size:9.5px;padding:4px 5px}}
+@media (prefers-reduced-motion:reduce){.dk-danger{animation:none}}

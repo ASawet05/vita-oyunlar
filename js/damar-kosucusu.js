@@ -8,7 +8,7 @@
 import { createAudio } from "./damar/ses.js";
 import { createWorld, LANES } from "./damar/dunya.js";
 import { createRunner } from "./damar/karakter.js";
-import { createObjects, makeRowPattern, OB, CAPSULE } from "./damar/nesneler.js";
+import { createObjects, makeRowPattern, buildMicrobe, OB, CAPSULE } from "./damar/nesneler.js";
 import { loadProfile, saveProfile, bumpMission, upgDuration } from "./damar/kayit.js";
 import { createMenu } from "./damar/magaza.js";
 
@@ -25,7 +25,19 @@ const canvas = $("dkCanvas"), stage = $("dkStage");
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: (window.devicePixelRatio || 1) < 2, powerPreference: "high-performance" }); }
 catch (e) { fatal("Bu tarayıcı/cihaz 3D grafik (WebGL) desteklemiyor."); throw e; }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const MAX_PR = Math.min(window.devicePixelRatio || 1, 2);
+let curPR = MAX_PR; renderer.setPixelRatio(curPR);
+/* Uyarlanabilir çözünürlük: koşu sırasında kare hızı düşükse piksel oranını kademeli düşür (en az 1), yükselirse geri al */
+let prAcc = 0, prFrames = 0;
+function adaptPR(dt) {
+  prAcc += dt; prFrames++;
+  if (prAcc < 2) return;
+  const fps = prFrames / prAcc; prAcc = 0; prFrames = 0;
+  let next = curPR;
+  if (fps < 42 && curPR > 1) next = Math.max(1, curPR - 0.25);
+  else if (fps > 57 && curPR < MAX_PR) next = Math.min(MAX_PR, curPR + 0.25);
+  if (next !== curPR) { curPR = next; renderer.setPixelRatio(curPR); resize(); }
+}
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 220);
 const world = createWorld(THREE, scene);
@@ -33,30 +45,16 @@ const runner = createRunner(THREE); scene.add(runner.group);
 const objs = createObjects(THREE, scene);
 const sfx = createAudio(MUTE_KEY);
 
-// Dev Toksin Hücresi (kovalayan) + "!" uyarı işareti
-const chaser = new THREE.Group();
-const warnSprite = (() => {
-  const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d");
-  x.fillStyle = "#facc15"; x.beginPath(); x.arc(64, 64, 58, 0, Math.PI * 2); x.fill();
-  x.lineWidth = 8; x.strokeStyle = "#7f1d1d"; x.stroke();
-  x.fillStyle = "#b91c1c"; x.font = "900 96px system-ui,sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText("!", 64, 70);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
-  sp.scale.set(1.1, 1.1, 1); sp.position.set(0, 2.7, 0); sp.renderOrder = 10; return sp;
-})();
-{
-  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.35, 2), new THREE.MeshStandardMaterial({ color: 0x365314, emissive: 0x4d7c0f, emissiveIntensity: 0.5, roughness: 0.6, flatShading: true }));
-  chaser.add(core);
-  const spikeM = new THREE.MeshStandardMaterial({ color: 0x581c87, emissive: 0x7e22ce, emissiveIntensity: 0.7 });
-  for (let i = 0; i < 26; i++) { const p = new THREE.Vector3().randomDirection(); const s = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 6), spikeM); s.position.copy(p).multiplyScalar(1.45); s.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p); core.add(s); }
-  const eyeM = new THREE.MeshBasicMaterial({ color: 0xfde047 });
-  [-0.45, 0.45].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), eyeM); e.position.set(x, 0.35, -1.25); chaser.add(e); });
-  chaser.add(warnSprite);
-  chaser.scale.setScalar(0.72); chaser.position.set(0, 0.5, 16); chaser.visible = false; scene.add(chaser);
-}
+// Dev Toksin Hücresi (kovalayan): prosedürel mikrop + sarı gözler. "!" uyarısı ekranın alt kenarında (HTML)
+const chaserMic = buildMicrobe(THREE, { r: 1.25, membrane: 0x4d7c0f, glow: 0x84cc16, nucleus: 0x6b21a8, tip: 0xc026d3, spikes: 30, tentacles: 7, eyes: true });
+const chaser = chaserMic.group;
+chaser.scale.setScalar(0.56); chaser.position.set(0, 0.5, 16); chaser.visible = false; scene.add(chaser);
 // Hızlı iniş şok dalgası halkası
 const shock = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 40), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
 shock.rotation.x = -Math.PI / 2; shock.visible = false; scene.add(shock);
 let shockT = 0;
+const dangerEl = $("dkDanger"), dangerTxt = dangerEl.querySelector("span");
+let dangerShown = false;
 
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
@@ -101,13 +99,15 @@ function renderHud(force) {
   $("dkDist").textContent = Math.floor(S.dist) + " m";
   $("dkDrops").textContent = String(S.drops);
   $("dkBest").textContent = String(Math.max(best(), sc));
-  const chips = [`<span class="dk-chip dk-chip--mult">✖ ${profile.multiplier}</span>`];
-  if (S.x2T > 0) chips.push(`<span class="dk-chip dk-chip--x2">2x Skor ${Math.ceil(S.x2T)} sn</span>`);
-  if (S.chaseT > 0) chips.push(`<span class="dk-chip dk-chip--chase">💫 Sersem · Toksin peşinde ${Math.ceil(S.chaseT)} sn</span>`);
-  if (S.boardT > 0) chips.push(`<span class="dk-chip dk-chip--board">🛹 ${Math.ceil(S.boardT)} sn</span>`);
-  if (S.jetT > 0) chips.push(`<span class="dk-chip dk-chip--sun">🚀 D3 Jet ${Math.ceil(S.jetT)} sn</span>`);
-  if (S.bootsT > 0) chips.push(`<span class="dk-chip dk-chip--boots">🥾 Mg Bot ${Math.ceil(S.bootsT)} sn</span>`);
-  if (S.magnetT > 0) chips.push(`<span class="dk-chip dk-chip--magnet">🧲 Fe ${Math.ceil(S.magnetT)} sn</span>`);
+  // Sol üst cam şerit: ikon + kalan saniye (tam ad title/aria-label'da)
+  const chip = (cls, icon, val, label) => `<span class="dk-chip dk-chip--${cls}" title="${label}" aria-label="${label}"><b aria-hidden="true">${icon}</b>${val}</span>`;
+  const chips = [chip("mult", "✖", profile.multiplier, `Skor çarpanı x${profile.multiplier}`)];
+  if (S.x2T > 0) chips.push(chip("x2", "2x", Math.ceil(S.x2T), `2x Skor ${Math.ceil(S.x2T)} sn`));
+  if (S.chaseT > 0) chips.push(chip("chase", "💫", Math.ceil(S.chaseT), `Sersem, Toksin peşinde ${Math.ceil(S.chaseT)} sn`));
+  if (S.boardT > 0) chips.push(chip("board", "🛹", Math.ceil(S.boardT), `Kaykay ${Math.ceil(S.boardT)} sn`));
+  if (S.jetT > 0) chips.push(chip("sun", "🚀", Math.ceil(S.jetT), `D3 Jet-Pack ${Math.ceil(S.jetT)} sn`));
+  if (S.bootsT > 0) chips.push(chip("boots", "🥾", Math.ceil(S.bootsT), `Mg Botları ${Math.ceil(S.bootsT)} sn`));
+  if (S.magnetT > 0) chips.push(chip("magnet", "🧲", Math.ceil(S.magnetT), `Fe Mıknatısı ${Math.ceil(S.magnetT)} sn`));
   $("dkChips").innerHTML = chips.join("");
   // Sağ üst: kaykay silüeti şarj barı (aşağıdan yukarı dolar)
   const bb = $("dkBoardBtn"), pct = Math.round(S.charge / CHARGE_MAX * 100);
@@ -136,7 +136,7 @@ function mission(id, amount, runValue) {
 function start() {
   sfx.unlock(); objs.clear();
   profile = loadProfile(); applyLook();
-  S = fresh(); S.mode = "run"; S.introT = INTRO_T; S.chaserZ = 1.6; runner.reset();
+  S = fresh(); S.mode = "run"; S.introT = INTRO_T; S.chaserZ = 2.5; runner.reset();
   ["dkStart", "dkOver", "dkPause"].forEach(id => { $(id).hidden = true; }); menu.closeStore();
   $("dkPauseBtn").disabled = false; lastHud = ""; renderHud(true);
   for (let z = -46; z > SPAWN_Z; z -= 18) spawnRow(z, true);
@@ -479,8 +479,14 @@ function update(dt) {
       o.mesh.rotation.y += dt * 3;
       if (S.magnetT > 0 && o.z > -30 && o.z < 1.5) { const k = Math.min(1, dt * 7); o.x += (S.x - o.x) * k; o.y += (S.y + 0.9 - o.y) * k; o.z += (0 - o.z) * k * 0.6; o.ride = null; o.vz = 0; } // zemin + çatı
       bob = Math.sin(o.t * 4) * 0.08;
-    } else if (o.type === "virus") { o.mesh.children[0].rotation.x += dt * 1.6; o.mesh.children[0].rotation.y += dt * 2.1; }
-    else if (o.type !== "capsule" && !OB[o.type]) { o.mesh.rotation.y += dt * 2.6; bob = Math.sin(o.t * 3) * 0.15; }
+    } else if (o.type === "virus") {
+      const c = o.mesh.userData.core; c.rotation.x += dt * 1.2; c.rotation.y += dt * 1.7;
+      c.scale.setScalar(1 + Math.sin(o.t * 5.5) * 0.07);                     // nabız gibi büyüyüp küçülme
+      o.mesh.children[0].rotation.y += dt * 0.6;
+    } else if (o.type !== "capsule" && !OB[o.type]) {
+      o.mesh.rotation.y += dt * 2.6; bob = Math.sin(o.t * 3) * 0.15;
+      const rg = o.mesh.userData.rings; if (rg) { rg[0].rotation.x += dt * 2.2; rg[0].rotation.z += dt * 1.1; rg[1].rotation.y += dt * 2.8; rg[1].rotation.x -= dt * 1.4; }
+    }
     o.mesh.position.set(o.x, o.y + bob, o.z);
 
     if (S.mode === "run") {
@@ -516,7 +522,7 @@ function update(dt) {
 
 /* ---------------- Döngü ---------------- */
 let last = performance.now();
-const camPos = new THREE.Vector3(0, 3.5, 6.4), camLook = new THREE.Vector3(0, 1.2, -9);
+const camPos = new THREE.Vector3(0, 3.2, 5.7), camLook = new THREE.Vector3(0, 1.3, -9);
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -536,24 +542,29 @@ function frame(now) {
   runner.group.visible = !(S.invulnT > 0 && Math.floor(S.t * 14) % 2 === 0);
   // Kovalayan Toksin: başlangıçta 2 sn ve sersemlemede enseden takip; sonra ekranın altına doğru geride kalır
   const chasing = S.chaseT > 0 || S.introT > 0;
-  if (S.mode !== "crashing" && !paused) S.chaserZ += ((chasing ? 2.0 : 16) - S.chaserZ) * Math.min(1, dt * 3);
-  const lurk = S.mode === "crashing" ? 0 : 1.3 * Math.tanh(3 * Math.sin(performance.now() / 1100));  // ekran kenarları arasında süzülür, oyuncuyu kapatmaz
-  chaser.visible = S.chaserZ < 13; chaser.position.set(S.x * 0.55 + lurk, 0.5 + Math.sin(performance.now() / 180) * 0.1, S.chaserZ);
-  warnSprite.visible = chasing && S.mode === "run";
-  if (warnSprite.visible) warnSprite.scale.setScalar(1.1 + Math.sin(performance.now() / 90) * 0.12);
-  if (chaser.visible && !paused) { chaser.children[0].rotation.y += dt * 1.5; chaser.children[0].rotation.x += dt * 0.7; }
+  if (S.mode !== "crashing" && !paused) S.chaserZ += ((chasing ? 2.5 : 16) - S.chaserZ) * Math.min(1, dt * 3);
+  const lurk = S.mode === "crashing" ? 0 : S.introT > 0 ? 1.6 : 1.55 * Math.tanh(3 * Math.sin(performance.now() / 1100));  // ekran kenarları arasında süzülür, oyuncuyu kapatmaz
+  chaser.visible = S.chaserZ < 13; chaser.position.set(S.x * 0.55 + lurk, 0.3 + Math.sin(performance.now() / 180) * 0.1, S.chaserZ);
+  const dangerOn = chasing && S.mode === "run";
+  if (dangerOn !== dangerShown) { dangerShown = dangerOn; dangerEl.hidden = !dangerOn; }
+  if (dangerOn) { const txt = S.chaseT > 0 ? `Toksin peşinde · ${Math.ceil(S.chaseT)} sn` : "Toksin arkanda!"; if (dangerTxt.textContent !== txt) dangerTxt.textContent = txt; }
+  if (chaser.visible && !paused) { chaserMic.core.rotation.y += dt * 1.5; chaserMic.core.rotation.x += dt * 0.7; chaserMic.core.scale.setScalar(1 + Math.sin(performance.now() / 160) * 0.06); }
   // Şok dalgası
   if (shockT > 0 && !paused) { shockT -= dt; const k = 1 - shockT / 0.45; shock.scale.setScalar(0.3 + k * 3.2); shock.material.opacity = 0.85 * (1 - k); if (shockT <= 0) shock.visible = false; }
   world.glow.position.set(S.x, S.y + 2.4, 1.6);
-  camPos.set(S.x * 0.55, 3.5 + S.y * 0.55, 6.4); camLook.set(S.x * 0.55, 1.2 + S.y * 0.5, -9);
+  camPos.set(S.x * 0.55, 3.2 + S.y * 0.55, 5.7); camLook.set(S.x * 0.55, 1.3 + S.y * 0.5, -9);
   camera.position.lerp(camPos, Math.min(1, dt * 8));
   if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt); const k = S.shake * 0.9; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; }
   camera.lookAt(camLook);
   const fovT = (stage.clientWidth / stage.clientHeight < 0.75 ? 74 : 64) + Math.min(8, (S.level - 1) * 1.2) * (S.mode === "run" ? 1 : 0);
   if (Math.abs(camera.fov - fovT) > 0.05) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
+  if (S.mode === "run") adaptPR(dt);
   renderer.render(scene, camera);
   if (S.mode === "run" || S.mode === "crashing") renderHud();
+  const playing = S.mode !== "ready";
+  if (playing !== stagePlaying) { stagePlaying = playing; stage.classList.toggle("is-playing", playing); }
 }
+let stagePlaying = null;
 renderHud(true);
 requestAnimationFrame(frame);
 $("dkLoading").hidden = true;
@@ -571,6 +582,9 @@ window.DamarKosucusu = {
     holdRows: (v) => { S.untilRow = v ? 1e9 : 10; },
     setProfile: (patch) => { Object.assign(profile, patch); saveProfile(profile); applyLook(); menu.renderHome(); renderHud(true); },
     ground: () => objs.groundAt(LANES[S.lane]),
-    look: () => applied
+    look: () => applied,
+    render: () => Object.assign({}, renderer.info.render),
+    scene: () => scene,
+    pixelRatio: () => curPR
   }
 };

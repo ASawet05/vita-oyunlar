@@ -17,7 +17,7 @@ export function createMenu({ getProfile, sfx, onChange, toast }) {
     $("dkMult").textContent = "x" + p.multiplier;
     $("dkMissions").innerHTML = p.missions.map(m => {
       const pct = Math.min(100, Math.round(m.progress / m.target * 100));
-      return `<li class="dk-mission${m.done ? " is-done" : ""}"><span>${m.done ? "✅" : "🎯"} ${esc(missionText(m))}</span><b>${m.done ? "Tamam" : `${m.progress}/${m.target}`}</b><i style="width:${pct}%"></i></li>`;
+      return `<li class="dk-mission${m.done ? " is-done" : ""}" title="${esc(missionText(m))}"><span>${m.done ? "✅" : "🎯"} ${esc(missionText(m))}</span><b>${m.done ? "Tamam" : `${m.progress}/${m.target}`}</b><i style="width:${pct}%"></i></li>`;
     }).join("");
     renderWord($("dkWordHome"), p.word);
     const boxBadge = $("dkBoxBadge"); if (boxBadge) { boxBadge.textContent = String(p.boxes); boxBadge.hidden = !p.boxes; }
