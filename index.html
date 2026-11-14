@@ -25,6 +25,16 @@
   .vo-card:hover .vo-play{background:var(--teal-d)}
   .vo-soon{border-style:dashed;background:#f8fafc;box-shadow:none;cursor:default}
   .vo-soon:hover{transform:none;border-color:var(--line);box-shadow:none}
+  .vo-card--feat{grid-column:1/-1;background:linear-gradient(150deg,#0f172a 0%,#0b2a3a 55%,#064e3b 100%);border-color:rgba(45,212,191,.45);color:#e2e8f0;box-shadow:0 0 0 1px rgba(13,148,136,.2),0 16px 36px -16px rgba(13,148,136,.6)}
+  .vo-card--feat:hover{border-color:#5eead4}
+  .vo-card--feat h2{color:#fff;font-size:20px}
+  .vo-card--feat p{color:#cbd5e1}
+  .vo-card--feat p b{color:#fff}
+  .vo-card--feat .vo-best{color:#94a3b8}
+  .vo-feat-badge{display:inline-block;margin-bottom:2px;font-size:11px;font-weight:900;color:#fcd34d;letter-spacing:.02em}
+  .vo-chip--dark{background:rgba(13,148,136,.2);border-color:rgba(45,212,191,.4);color:#99f6e4}
+  .ico-block{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:5px;background:rgba(2,6,23,.6);border:1px solid rgba(45,212,191,.4)}
+  .ico-block span{display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--c);color:#fff;font-size:10px;font-weight:900;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
   .hero{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0f766e,#0d9488 60%,#14b8a6);color:#fff;border-radius:22px;padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
   .hero h1{margin:0;font-size:21px;font-weight:900}
   .hero p{margin:4px 0 0;font-size:13.5px;opacity:.92;line-height:1.5}
@@ -48,6 +58,14 @@
 
   <h2 class="sr-only">Oyunlar</h2>
   <div class="lobby">
+    <a class="vo-card vo-card--feat" href="vitablock.html">
+      <div class="vo-card-top">
+        <div class="vo-card-ico ico-block" aria-hidden="true"><span style="--c:#ef4444">Fe</span><span style="--c:#f97316">C</span><span style="--c:#eab308">D₃</span><span style="--c:#06b6d4">💧</span></div>
+        <div><span class="vo-feat-badge">✨ Yeni · Öne çıkan</span><h2>VitaBlock</h2><span class="vo-chip vo-chip--dark">Bulmaca · Sınırsız</span></div>
+      </div>
+      <p>Vitamin ve mineral bloklarını 8×8 hücreye yerleştirin, satır ve sütunları patlatın. <b>C + Demir</b> ve <b>D3 + K2</b> sinerjileriyle 2× puan; serbest radikallere dikkat!</p>
+      <div class="vo-card-foot"><span class="vo-best" data-best="vo_best_vitablock">En iyi: —</span><span class="vo-play">Oyna ▶</span></div>
+    </a>
     <a class="vo-card" href="oyun1.html">
       <div class="vo-card-top">
         <div class="vo-card-ico ico-mem" aria-hidden="true">🧩</div>

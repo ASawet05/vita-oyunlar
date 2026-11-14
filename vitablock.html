@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VitaBlock · Vita Oyunlar</title>
+<meta name="description" content="VitaBlock: vitamin ve mineral bloklarını 8x8 hücreye yerleştirin, satır ve sütunları patlatın, biyolojik sinerji bonuslarını yakalayın.">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Crect x='10' y='10' width='20' height='20' rx='5' fill='%23ef4444'/%3E%3Crect x='34' y='10' width='20' height='20' rx='5' fill='%23f97316'/%3E%3Crect x='10' y='34' width='20' height='20' rx='5' fill='%23eab308'/%3E%3Crect x='34' y='34' width='20' height='20' rx='5' fill='%2306b6d4'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/ortak.css">
+<link rel="stylesheet" href="css/vitablock.css">
+</head>
+<body class="vb-body">
+<header class="vb-bar">
+  <a class="vb-back" href="index.html" aria-label="Oyunlar menüsüne dön">← Oyunlar Menüsü</a>
+  <div class="vb-scores" aria-live="polite">
+    <div class="vb-score"><small>Skor</small><b id="vbScore">0</b></div>
+    <div class="vb-score vb-score--best"><small>Rekor</small><b id="vbBest">0</b></div>
+  </div>
+  <button type="button" class="vb-sound" id="vbSound" aria-pressed="true" aria-label="Sesi kapat" title="Ses açık / kapalı">🔊</button>
+</header>
+
+<main class="vb-main">
+  <div class="vb-frame" id="vbFrame">
+    <canvas id="vbCanvas" role="img" aria-label="VitaBlock oyun tahtası: 8x8 hücre ve altta yerleştirilecek 3 parça"></canvas>
+    <div class="vb-toasts" id="vbToasts" aria-live="polite"></div>
+  </div>
+
+  <section class="vb-info" aria-label="Nasıl oynanır">
+    <div class="vb-legend">
+      <span class="vb-chip" style="--c:#ef4444">Fe <small>Demir</small></span>
+      <span class="vb-chip" style="--c:#f97316">C <small>C vitamini</small></span>
+      <span class="vb-chip" style="--c:#eab308">D₃ <small>D3 vitamini</small></span>
+      <span class="vb-chip" style="--c:#10b981">K₂ <small>K2 vitamini</small></span>
+      <span class="vb-chip" style="--c:#06b6d4">💧 <small>Su</small></span>
+      <span class="vb-chip vb-chip--tox" style="--c:#64748b">R• <small>Serbest radikal</small></span>
+    </div>
+    <details class="vb-rules">
+      <summary>Nasıl oynanır?</summary>
+      <ul>
+        <li>Alttaki 3 parçadan birini sürükleyip tahtaya bırakın (veya parçaya dokunup sonra tahtada bir hücreye dokunun). Üçü de yerleşince yeni parçalar gelir.</li>
+        <li>Bir <b>satır</b> veya <b>sütun</b> tamamen dolunca patlar. Aynı anda birden çok satır/sütun → <b>Kombo çarpanı</b>.</li>
+        <li><b>C + Demir Sinerjisi:</b> Patlayan satırda hem Fe hem C varsa o satır <b>2×</b> puan (C vitamini demir emilimini artırır).</li>
+        <li><b>D3 + K2 Kemik Sinerjisi:</b> Patlayan satırda hem D₃ hem K₂ varsa o satır <b>2×</b> puan.</li>
+        <li>Her <b>6 hamlede</b> bir boş hücrede gri bir <b>Serbest Radikal</b> belirir; ancak bulunduğu satır veya sütunu patlatarak temizlenir.</li>
+        <li>Parçalardan hiçbiri sığmazsa hücre doygunluğa ulaşır ve oyun biter.</li>
+      </ul>
+    </details>
+    <div class="vb-actions"><button type="button" class="vb-restart" id="vbRestart">↻ Yeni oyun</button></div>
+    <p class="vb-note">Oyun eğlence amaçlıdır; sinerji kuralları genel beslenme bilgisinden esinlenmiştir, tıbbi tavsiye değildir. Skor ve kayıt yalnızca bu cihazda saklanır.</p>
+  </section>
+</main>
+
+<div class="vo-modal" id="vbOver" hidden role="dialog" aria-modal="true" aria-labelledby="vbOverTitle">
+  <div class="vo-modal-card vb-over">
+    <div class="vo-modal-emoji" aria-hidden="true">🧫</div>
+    <h2 id="vbOverTitle">Hücre Doygunluğa Ulaştı</h2>
+    <p class="vb-over-sub">Oyun Bitti</p>
+    <div class="vb-over-scores">
+      <div><small>Skor</small><b id="vbOverScore">0</b></div>
+      <div><small>En yüksek</small><b id="vbOverBest">0</b></div>
+    </div>
+    <p id="vbOverNote" class="vb-over-note"></p>
+    <div class="vo-modal-actions">
+      <button type="button" class="vo-btn" id="vbAgain">Tekrar Oyna</button>
+      <a class="vo-btn vo-btn--ghost" href="index.html">Oyunlar Menüsü</a>
+    </div>
+  </div>
+</div>
+
+<script src="js/vitablock.js"></script>
+</body>
+</html>

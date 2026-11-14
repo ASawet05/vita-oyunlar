@@ -10,6 +10,7 @@ index.html        Lobi (oyun seçim menüsü) + "← VitaTakip'e Dön"
 css/ortak.css     Ortak tasarım (VitaTakip renkleri, üst bar, kartlar, pencereler)
 oyun1.html        Vitamin Hafıza Eşleştirme   → css/oyun1.css, js/oyun1.js
 oyun2.html        Sağlıklı Sepet (refleks)     → css/oyun2.css, js/oyun2.js
+vitablock.html    VitaBlock (8x8 blok bulmaca) → css/vitablock.css, js/vitablock.js
 ```
 
 ## Yeni oyun eklemek
