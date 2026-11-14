@@ -17,16 +17,27 @@
     <div class="vb-score"><small>Skor</small><b id="vbScore">0</b></div>
     <div class="vb-score vb-score--best"><small>Rekor</small><b id="vbBest">0</b></div>
   </div>
-  <button type="button" class="vb-sound" id="vbSound" aria-pressed="true" aria-label="Sesi kapat" title="Ses açık / kapalı">🔊</button>
+  <div class="vb-tools">
+    <button type="button" class="vb-sound vb-tool" id="vbHelpBtn" aria-label="Nasıl oynanır ve renk açıklamaları" title="Nasıl oynanır?">?</button>
+    <button type="button" class="vb-sound vb-tool" id="vbRestart" aria-label="Yeni oyun" title="Yeni oyun">↻</button>
+    <button type="button" class="vb-sound" id="vbSound" aria-pressed="true" aria-label="Sesi kapat" title="Ses açık / kapalı">🔊</button>
+  </div>
 </header>
+<div class="vb-toxbar"><span class="vb-tox" id="vbTox" aria-live="polite" aria-label="Sonraki serbest radikal"><i aria-hidden="true">R•</i> Sonraki R•: <b id="vbToxCount">6 hamle</b></span></div>
 
 <main class="vb-main">
   <div class="vb-frame" id="vbFrame">
     <canvas id="vbCanvas" role="img" aria-label="VitaBlock oyun tahtası: 8x8 hücre ve altta yerleştirilecek 3 parça"></canvas>
     <div class="vb-toasts" id="vbToasts" aria-live="polite"></div>
+    <div class="vb-awards" id="vbAwards" aria-live="polite"></div>
   </div>
 
-  <section class="vb-info" aria-label="Nasıl oynanır">
+
+</main>
+
+<div class="vo-modal" id="vbHelp" hidden role="dialog" aria-modal="true" aria-labelledby="vbHelpTitle">
+  <div class="vo-modal-card vb-over vb-help">
+    <h2 id="vbHelpTitle">Nasıl oynanır?</h2>
     <div class="vb-legend">
       <span class="vb-chip" style="--c:#ef4444">Fe <small>Demir</small></span>
       <span class="vb-chip" style="--c:#f97316">C <small>C vitamini</small></span>
@@ -35,9 +46,7 @@
       <span class="vb-chip" style="--c:#06b6d4">💧 <small>Su</small></span>
       <span class="vb-chip vb-chip--tox" style="--c:#64748b">R• <small>Serbest radikal</small></span>
     </div>
-    <details class="vb-rules">
-      <summary>Nasıl oynanır?</summary>
-      <ul>
+    <ul class="vb-help-list">
         <li>Alttaki 3 parçadan birini sürükleyip tahtaya bırakın (veya parçaya dokunup sonra tahtada bir hücreye dokunun). Üçü de yerleşince yeni parçalar gelir.</li>
         <li>Bir <b>satır</b> veya <b>sütun</b> tamamen dolunca patlar. Aynı anda birden çok satır/sütun → <b>Kombo çarpanı</b>.</li>
         <li><b>C + Demir Sinerjisi:</b> Patlayan satırda hem Fe hem C varsa o satır <b>2×</b> puan (C vitamini demir emilimini artırır).</li>
@@ -45,11 +54,22 @@
         <li>Her <b>6 hamlede</b> bir boş hücrede gri bir <b>Serbest Radikal</b> belirir; ancak bulunduğu satır veya sütunu patlatarak temizlenir.</li>
         <li>Parçalardan hiçbiri sığmazsa hücre doygunluğa ulaşır ve oyun biter.</li>
       </ul>
-    </details>
-    <div class="vb-actions"><button type="button" class="vb-restart" id="vbRestart">↻ Yeni oyun</button></div>
     <p class="vb-note">Oyun eğlence amaçlıdır; sinerji kuralları genel beslenme bilgisinden esinlenmiştir, tıbbi tavsiye değildir. Skor ve kayıt yalnızca bu cihazda saklanır.</p>
-  </section>
-</main>
+    <div class="vo-modal-actions"><button type="button" class="vo-btn" id="vbHelpClose">Anladım</button></div>
+  </div>
+</div>
+
+<div class="vo-modal" id="vbConfirm" hidden role="alertdialog" aria-modal="true" aria-labelledby="vbConfirmTitle">
+  <div class="vo-modal-card vb-over vb-confirm">
+    <div class="vo-modal-emoji" aria-hidden="true">↻</div>
+    <h2 id="vbConfirmTitle">Mevcut oyun sıfırlansın mı?</h2>
+    <p class="vb-confirm-text">Skorunuz ve tahtadaki bloklar silinir. Rekorunuz korunur.</p>
+    <div class="vo-modal-actions">
+      <button type="button" class="vo-btn" id="vbConfirmYes">Evet, sıfırla</button>
+      <button type="button" class="vo-btn vo-btn--ghost" id="vbConfirmNo">Vazgeç</button>
+    </div>
+  </div>
+</div>
 
 <div class="vo-modal" id="vbOver" hidden role="dialog" aria-modal="true" aria-labelledby="vbOverTitle">
   <div class="vo-modal-card vb-over">

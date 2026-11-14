@@ -48,3 +48,34 @@
 .vb-over-scores b{display:block;font-size:26px;font-weight:900;color:#fff}
 .vb-over-note{min-height:1em;color:#fcd34d !important;font-weight:800}
 @media (max-width:360px){.vb-back{padding:0 9px;font-size:12px}.vb-score{min-width:54px;padding:4px 7px}.vb-score b{font-size:16px}}
+
+/* --- Sade düzen: ? ve ↻ üst barda; alt alan yalnızca tahta + parça tepsisi --- */
+.vb-tools{display:flex;gap:6px}
+.vb-tool{font-size:19px;font-weight:900;color:#ccfbf1}
+.vb-toxbar{display:flex;justify-content:center;padding:6px 12px 0}
+.vb-tox{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:rgba(2,6,23,.55);border:1px solid rgba(148,163,184,.3);font-size:12px;font-weight:800;color:#cbd5e1}
+.vb-tox i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:#64748b;color:#fff;font-size:10px;font-weight:900}
+.vb-tox b{color:#fff}
+.vb-tox.is-soon{border-color:#f87171;color:#fecaca;animation:vb-blink 1s ease-in-out infinite}
+.vb-tox.is-soon b{color:#fca5a5}
+@keyframes vb-blink{50%{box-shadow:0 0 0 3px rgba(248,113,113,.35)}}
+/* Tahta ekranın yüksekliğine de sığacak kadar büyür (kaydırmasız) */
+.vb-main{padding-top:8px}
+.vb-frame{width:min(520px,100%,calc((100dvh - 118px) / 1.345))}
+/* Ödül etiketi: tahtanın ortasında parlayıp yukarı süzülür (1.2 sn) */
+.vb-awards{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;z-index:6}
+.vb-award{max-width:92%;padding:10px 18px;border-radius:16px;font-size:clamp(15px,4.6vw,22px);font-weight:900;letter-spacing:.01em;text-align:center;color:#0f172a;background:linear-gradient(90deg,#99f6e4,#5eead4);box-shadow:0 0 0 2px rgba(255,255,255,.5),0 0 30px rgba(94,234,212,.75),0 14px 30px -10px rgba(0,0,0,.7);opacity:0;animation:vb-award 1.2s cubic-bezier(.2,.8,.2,1) forwards}
+.vb-award--fe{background:linear-gradient(90deg,#fca5a5,#fdba74);box-shadow:0 0 0 2px rgba(255,255,255,.55),0 0 34px rgba(249,115,22,.8),0 14px 30px -10px rgba(0,0,0,.7)}
+.vb-award--bone{background:linear-gradient(90deg,#fde047,#6ee7b7);box-shadow:0 0 0 2px rgba(255,255,255,.55),0 0 34px rgba(234,179,8,.8),0 14px 30px -10px rgba(0,0,0,.7)}
+.vb-award--combo{background:linear-gradient(90deg,#fb923c,#f43f5e);color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.45),0 0 34px rgba(244,63,94,.8),0 14px 30px -10px rgba(0,0,0,.7)}
+.vb-award--multi{background:linear-gradient(90deg,#67e8f9,#a78bfa)}
+@keyframes vb-award{0%{opacity:0;transform:translateY(16px) scale(.7)}15%{opacity:1;transform:translateY(0) scale(1.08)}30%{transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:translateY(-46px) scale(.96)}}
+/* Yardım ve onay pencereleri */
+.vb-help{text-align:left;max-height:calc(100dvh - 32px);overflow:auto}
+.vb-help h2{text-align:center}
+.vb-help .vb-legend{margin:6px 0 10px}
+.vb-help-list{margin:0 0 6px;padding-left:18px;font-size:13px;line-height:1.55;color:#cbd5e1}
+.vb-help-list b{color:#fff}
+.vb-help .vb-note{text-align:center}
+.vb-confirm-text{margin:0 0 14px !important;color:#cbd5e1 !important;font-size:14px}
+@media (max-width:400px){.vb-bar{gap:5px;padding:8px}.vb-back{font-size:11.5px;padding:0 8px}.vb-score{min-width:48px;padding:3px 6px}.vb-score b{font-size:15px}.vb-sound{width:36px;height:36px;font-size:16px}.vb-tools{gap:4px}}

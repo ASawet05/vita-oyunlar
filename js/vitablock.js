@@ -61,17 +61,24 @@
     for (var r = 0; r <= N - p.h; r++) for (var c = 0; c <= N - p.w; c++) if (canPlace(board, p, r, c)) return true;
     return false;
   }
-  /* Adil üretim: yeni üçlüden en az biri tahtaya sığsın (mümkünse) */
+  /* Adil üretim: yeni üçlüden EN AZ BİRİ mevcut tahtaya kesinlikle sığar.
+     Önce rastgele üçlüler denenir; hiçbiri sığmazsa tahtaya sığan şekiller arasından biri zorla eklenir
+     (tahtada tek bir boş hücre bile yoksa oyun zaten adil biçimde biter). */
   function newTray() {
     var tray;
     for (var a = 0; a < 40; a++) {
       tray = [makePiece(), makePiece(), makePiece()];
-      if (tray.some(function (p) { return fitsAnywhere(st.board, p); })) break;
+      if (tray.some(function (p) { return fitsAnywhere(st.board, p); })) { st.tray = tray; return; }
+    }
+    var fitting = SHAPES.filter(function (sh) { return fitsAnywhere(st.board, sh); });
+    if (fitting.length) {
+      var sh = fitting[Math.floor(Math.random() * fitting.length)];
+      tray[Math.floor(Math.random() * 3)] = { cells: sh.cells, w: sh.w, h: sh.h, kind: KINDS[Math.floor(Math.random() * KINDS.length)] };
     }
     st.tray = tray;
   }
   function newGame() {
-    st = { board: emptyBoard(), tray: [null, null, null], score: 0, moves: 0, streak: 0, over: false };
+    st = { board: emptyBoard(), tray: [null, null, null], score: 0, moves: 0, streak: 0, over: false, toxWarn: null };
     newTray();
     save();
     ui.score(); closeOver();
@@ -79,7 +86,7 @@
   }
   function save() {
     if (!st || st.over) { store(SAVE_KEY, null); return; }
-    store(SAVE_KEY, JSON.stringify({ board: st.board, tray: st.tray, score: st.score, moves: st.moves, streak: st.streak }));
+    store(SAVE_KEY, JSON.stringify({ board: st.board, tray: st.tray, score: st.score, moves: st.moves, streak: st.streak, toxWarn: st.toxWarn }));
   }
   function restore() {
     try {
@@ -87,7 +94,7 @@
       if (!s || !Array.isArray(s.board) || s.board.length !== N || !Array.isArray(s.tray)) return false;
       var okKind = function (k) { return k === null || TYPES[k]; };
       if (!s.board.every(function (row) { return Array.isArray(row) && row.length === N && row.every(okKind); })) return false;
-      st = { board: s.board, tray: s.tray.map(function (p) { return p && Array.isArray(p.cells) && TYPES[p.kind] ? p : null; }), score: Number(s.score) || 0, moves: Number(s.moves) || 0, streak: Number(s.streak) || 0, over: false };
+      st = { board: s.board, tray: s.tray.map(function (p) { return p && Array.isArray(p.cells) && TYPES[p.kind] ? p : null; }), score: Number(s.score) || 0, moves: Number(s.moves) || 0, streak: Number(s.streak) || 0, over: false, toxWarn: s.toxWarn && Number.isInteger(s.toxWarn.r) ? { r: s.toxWarn.r, c: s.toxWarn.c } : null };
       if (!st.tray.some(Boolean)) newTray();
       return true;
     } catch (_) { return false; }
@@ -124,8 +131,10 @@
     pick: function () { tone(660, 0.05, "triangle", 0.06); },
     place: function () { tone(210, 0.12, "sine", 0.16, 130); tone(420, 0.05, "triangle", 0.04); },
     bad: function () { tone(150, 0.09, "square", 0.04, 120); },
-    clear: function (n) { noise(0.28, 0.1, 2400); [523, 659, 784, 1047].slice(0, Math.min(4, 1 + n)).forEach(function (f, i) { tone(f, 0.16, "triangle", 0.08, null, i * 0.06); }); },
-    synergy: function () { [784, 988, 1175, 1568].forEach(function (f, i) { tone(f, 0.14, "sine", 0.07, null, 0.12 + i * 0.07); }); },
+    // k: ardışık kombo adımı → her adımda bir tam ton (2 yarım ses) tiz
+    clear: function (n, k) { var m = Math.pow(2, Math.min(12, ((k || 1) - 1) * 2) / 12); noise(0.28, 0.1, 2400); [523, 659, 784, 1047].slice(0, Math.min(4, 1 + n)).forEach(function (f, i) { tone(f * m, 0.16, "triangle", 0.08, null, i * 0.06); }); },
+    synergy: function (k) { var m = Math.pow(2, Math.min(12, ((k || 1) - 1) * 2) / 12); [784, 988, 1175, 1568].forEach(function (f, i) { tone(f * m, 0.14, "sine", 0.07, null, 0.12 + i * 0.07); }); },
+    warn: function () { tone(880, 0.07, "square", 0.025); tone(660, 0.09, "square", 0.02, null, 0.09); },
     tox: function () { tone(140, 0.28, "sawtooth", 0.04, 90); },
     over: function () { [392, 330, 262, 196].forEach(function (f, i) { tone(f, 0.28, "triangle", 0.08, null, i * 0.16); }); }
   };
@@ -264,34 +273,37 @@
         lineScore += 80 * mult;
         fx.waves.push({ row: ln.row, col: ln.col, t: 0 });
       });
+      var pr = r0 + (p.h - 1) / 2, pc = c0 + (p.w - 1) / 2;
       Object.keys(clearSet).forEach(function (key) {
         var rc = key.split(",").map(Number), kind = clearSet[key];
         if (kind === "tox") toxins++;
         st.board[rc[0]][rc[1]] = null;
-        var cp = cellCenter(rc[0], rc[1]); burst(cp.x, cp.y, TYPES[kind].color, 7, 1);
-        fx.appear.push({ r: rc[0], c: rc[1], kind: kind, t: 0, out: true });
+        // Gecikme: parçanın merkezinden uzaklığa göre — çizgi boyunca yayılan ışık dalgası hissi
+        fx.appear.push({ r: rc[0], c: rc[1], kind: kind, t: 0, out: true, d: 0.001 + (Math.abs(rc[0] - pr) + Math.abs(rc[1] - pc)) * 0.035 });
       });
       st.streak += 1;
       var combo = n; // aynı anda patlayan satır+sütun sayısı = kombo çarpanı
       var streakBonus = st.streak > 1 ? (st.streak - 1) * 20 : 0;
       var clearGain = lineScore * combo + toxins * 25 + streakBonus;
       gained += clearGain;
-      fx.shake = Math.min(14, 5 + n * 3);
-      sfx.clear(n);
+      fx.shake = Math.min(9, 3 + n * 2);   // hafif sarsıntı
+      sfx.clear(n, st.streak);              // ardışık kombolarda nota her adımda bir ton tizleşir
       var mid = cellCenter(r0 + Math.floor(p.h / 2), c0 + Math.floor(p.w / 2));
       floatText("+" + clearGain, mid.x, mid.y, "#fde68a");
-      if (combo > 1) toast("Kombo x" + combo + "! " + n + " çizgi birden", "combo");
-      if (feC) { toast("C + Demir Sinerjisi! Emilim 2x Puan!", "fe"); sfx.synergy(); }
-      if (bone) { toast("D3 + K2 Kemik Sinerjisi! 2x Puan!", "bone"); if (!feC) sfx.synergy(); }
+      // Ekranın ortasında parlayıp yukarı süzülen ödül etiketleri (1.2 sn)
+      if (feC) { award("⚡ C + Fe EMİLİM SİNERJİSİ! 2x PUAN", "fe"); sfx.synergy(st.streak); }
+      if (bone) { award("🦴 D3 + K2 KEMİK SİNERJİSİ! 2x PUAN", "bone"); if (!feC) sfx.synergy(st.streak); }
+      if (combo > 1) award("💥 ÇOKLU PATLAMA x" + combo + "!", "multi");
+      if (st.streak > 1) award("🔥 KOMBO x" + st.streak + "!", "combo");
       if (toxins) toast("Serbest radikal temizlendi! +" + (toxins * 25), "tox");
-      if (st.streak > 1 && combo === 1) toast("Seri x" + st.streak + " (+" + streakBonus + ")", "combo");
     } else {
       st.streak = 0;
     }
     st.score += gained;
 
-    // Her 6 hamlede bir serbest radikal
+    // Her 6 hamlede bir serbest radikal; 1 hamle önce doğacağı kare uyarı olarak yanıp söner
     if (st.moves % TOX_EVERY === 0) spawnToxin();
+    else if (toxLeft() === 1) { st.toxWarn = pickToxCell(); if (st.toxWarn) sfx.warn(); }
     if (!st.tray.some(Boolean)) newTray();
     ui.score();
     checkOver();
@@ -299,11 +311,23 @@
     requestRender();
     return true;
   }
+  function toxLeft() { return TOX_EVERY - (st.moves % TOX_EVERY); }
+  /* Kenar/köşe tercihi: en dış halkadaki boş hücreler önce (ortadaki kritik boşluklar en son seçilir) */
+  function pickToxCell() {
+    var best = 9, list = [];
+    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+      if (st.board[r][c]) continue;
+      var ring = Math.min(r, c, N - 1 - r, N - 1 - c);
+      if (ring < best) { best = ring; list = []; }
+      if (ring === best) list.push({ r: r, c: c });
+    }
+    return list.length ? list[Math.floor(Math.random() * list.length)] : null;
+  }
   function spawnToxin() {
-    var empty = [];
-    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (!st.board[r][c]) empty.push([r, c]);
-    if (!empty.length) return;
-    var pick = empty[Math.floor(Math.random() * empty.length)];
+    var w = st.toxWarn && !st.board[st.toxWarn.r][st.toxWarn.c] ? st.toxWarn : pickToxCell();
+    st.toxWarn = null;
+    if (!w) return;
+    var pick = [w.r, w.c];
     st.board[pick[0]][pick[1]] = "tox";
     fx.appear.push({ r: pick[0], c: pick[1], kind: "tox", t: 0 });
     var cp = cellCenter(pick[0], pick[1]); burst(cp.x, cp.y, "#94a3b8", 10, 0.6);
@@ -339,10 +363,21 @@
     while (toasts.children.length > 3) toasts.removeChild(toasts.firstChild);
     setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 1950);
   }
+  var awardQ = 0;
+  function award(text, tone) {
+    var box = document.getElementById("vbAwards"); if (!box) return;
+    var d = document.createElement("div"), delay = awardQ * 280;
+    awardQ++; setTimeout(function () { awardQ = Math.max(0, awardQ - 1); }, 300);
+    d.className = "vb-award vb-award--" + (tone || "combo"); d.textContent = text; d.style.animationDelay = delay + "ms";
+    box.appendChild(d); setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 1200 + delay + 50);
+  }
   var ui = {
     score: function () {
       document.getElementById("vbScore").textContent = String(st.score);
       document.getElementById("vbBest").textContent = String(Math.max(bestScore(), st.score)); // rekor geçilirken canlı güncellenir
+      var left = toxLeft(), tc = document.getElementById("vbToxCount"), tw = document.getElementById("vbTox");
+      if (tc) tc.textContent = left + " hamle";
+      if (tw) { tw.classList.toggle("is-soon", left <= 1); tw.setAttribute("aria-label", "Sonraki serbest radikal: " + left + " hamle"); }
     }
   };
 
@@ -407,7 +442,7 @@
   /* ---------------- Çizim ---------------- */
   var raf = 0, lastT = 0;
   function requestRender() { if (!raf) raf = requestAnimationFrame(frameLoop); }
-  function busy() { return !!(drag || fx.particles.length || fx.waves.length || fx.floats.length || fx.shake > 0.2 || fx.appear.length); }
+  function busy() { return !!(drag || fx.particles.length || fx.waves.length || fx.floats.length || fx.shake > 0.2 || fx.appear.length || (st && st.toxWarn && !st.over)); }
   function frameLoop(t) {
     raf = 0;
     var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016; lastT = t;
@@ -420,7 +455,12 @@
       if (q.life <= 0) fx.particles.splice(i, 1);
     }
     fx.waves.forEach(function (w) { w.t += dt / 0.42; }); fx.waves = fx.waves.filter(function (w) { return w.t < 1; });
-    fx.appear.forEach(function (a) { a.t += dt / (a.out ? 0.32 : 0.4); }); fx.appear = fx.appear.filter(function (a) { return a.t < 1; });
+    fx.appear.forEach(function (a) {
+      if (a.d > 0) { a.d -= dt; if (a.d <= 0) { var cp = cellCenter(a.r, a.c); burst(cp.x, cp.y, TYPES[a.kind].color, 8, 1.05); burst(cp.x, cp.y, "#ffffff", 2, 0.8); } return; }
+      a.t += dt / (a.out ? 0.3 : 0.4);
+    });
+    fx.appear = fx.appear.filter(function (a) { return a.t < 1; });
+    fx.time = (fx.time || 0) + dt;
     fx.floats.forEach(function (f) { f.life -= dt; f.y -= 46 * dt; }); fx.floats = fx.floats.filter(function (f) { return f.life > 0; });
     fx.shake = Math.max(0, fx.shake - 38 * dt);
   }
@@ -448,6 +488,13 @@
     // Patlayan hücreler: beyaz parlayıp büyüyerek kaybolur
     fx.appear.forEach(function (a) {
       if (!a.out) return;
+      if (a.d > 0) { // sırası gelmeyen hücre: altın parıltıyla bekler
+        var bx = L.bx + a.c * L.cell, by = L.by + a.r * L.cell;
+        drawSprite(a.kind, bx, by, L.cell);
+        ctx.save(); ctx.strokeStyle = "#fde047"; ctx.lineWidth = 2.5; ctx.shadowColor = "#fde047"; ctx.shadowBlur = 12;
+        rr(ctx, bx + 2, by + 2, L.cell - 4, L.cell - 4, L.cell * 0.22); ctx.stroke(); ctx.restore();
+        return;
+      }
       var p = a.t, sz = L.cell * (1 + 0.35 * p), x = L.bx + a.c * L.cell + (L.cell - sz) / 2, y = L.by + a.r * L.cell + (L.cell - sz) / 2;
       drawSprite(a.kind, x, y, sz, 1 - p);
       ctx.globalAlpha = (1 - p) * 0.75; ctx.fillStyle = "#fff"; rr(ctx, x + sz * 0.06, y + sz * 0.06, sz * 0.88, sz * 0.88, sz * 0.2); ctx.fill(); ctx.globalAlpha = 1;
@@ -462,16 +509,38 @@
       if (horiz) ctx.fillRect(L.bx, pos0, L.bs, L.cell); else ctx.fillRect(pos0, L.by, L.cell, L.bs);
     });
 
+    // Serbest radikal uyarısı (1 hamle önce)
+    if (st.toxWarn && !st.board[st.toxWarn.r][st.toxWarn.c]) {
+      var wx = L.bx + st.toxWarn.c * L.cell, wy = L.by + st.toxWarn.r * L.cell, bl = 0.35 + 0.35 * (Math.sin((fx.time || 0) * 7) + 1) / 2;
+      ctx.save(); ctx.globalAlpha = bl; ctx.fillStyle = "rgba(148,163,184,.35)"; rr(ctx, wx + 3, wy + 3, L.cell - 6, L.cell - 6, L.cell * 0.2); ctx.fill();
+      ctx.setLineDash([5, 4]); ctx.strokeStyle = "#f87171"; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#e2e8f0"; ctx.font = "900 " + Math.round(L.cell * 0.32) + "px system-ui,sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("R•", wx + L.cell / 2, wy + L.cell / 2 + 1); ctx.restore();
+    }
     // Hayalet önizleme + patlayacak çizgilerin turkuaz vurgusu
     if (drag && drag.moved) {
       var t = dragTarget(drag), pc = st.tray[drag.idx];
       if (t && t.ok && pc) {
-        pc.cells.forEach(function (cc) { drawSprite(pc.kind, L.bx + (t.c + cc[1]) * L.cell, L.by + (t.r + cc[0]) * L.cell, L.cell, 0.36); });
-        var fl = linesIfPlaced(pc, t.r, t.c);
-        ctx.save(); ctx.strokeStyle = "#2dd4bf"; ctx.lineWidth = 3; ctx.shadowColor = "#2dd4bf"; ctx.shadowBlur = 14;
-        fl.rows.forEach(function (i) { rr(ctx, L.bx + 1.5, L.by + i * L.cell + 1.5, L.bs - 3, L.cell - 3, L.cell * 0.22); ctx.stroke(); });
-        fl.cols.forEach(function (i) { rr(ctx, L.bx + i * L.cell + 1.5, L.by + 1.5, L.cell - 3, L.bs - 3, L.cell * 0.22); ctx.stroke(); });
+        var fl = linesIfPlaced(pc, t.r, t.c), glowA = 0.75 + Math.sin((fx.time || 0) * 10) * 0.25;
+        // Yarı saydam parlak gölge
+        ctx.save(); ctx.shadowColor = "#5eead4"; ctx.shadowBlur = 10;
+        pc.cells.forEach(function (cc) { drawSprite(pc.kind, L.bx + (t.c + cc[1]) * L.cell, L.by + (t.r + cc[0]) * L.cell, L.cell, 0.5); });
         ctx.restore();
+        ctx.save(); ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = 2;
+        pc.cells.forEach(function (cc) { rr(ctx, L.bx + (t.c + cc[1]) * L.cell + 3, L.by + (t.r + cc[0]) * L.cell + 3, L.cell - 6, L.cell - 6, L.cell * 0.2); ctx.stroke(); });
+        ctx.restore();
+        if (fl.rows.length || fl.cols.length) {
+          // Patlayacak çizgi: dış çerçeve turkuaz, içindeki her bloğun kenarı altın
+          ctx.save(); ctx.globalAlpha = glowA; ctx.shadowBlur = 14;
+          ctx.strokeStyle = "#2dd4bf"; ctx.shadowColor = "#2dd4bf"; ctx.lineWidth = 3;
+          fl.rows.forEach(function (i) { rr(ctx, L.bx + 1.5, L.by + i * L.cell + 1.5, L.bs - 3, L.cell - 3, L.cell * 0.22); ctx.stroke(); });
+          fl.cols.forEach(function (i) { rr(ctx, L.bx + i * L.cell + 1.5, L.by + 1.5, L.cell - 3, L.bs - 3, L.cell * 0.22); ctx.stroke(); });
+          ctx.strokeStyle = "#fde047"; ctx.shadowColor = "#fde047"; ctx.lineWidth = 2;
+          var hl = function (r, c) { rr(ctx, L.bx + c * L.cell + 4, L.by + r * L.cell + 4, L.cell - 8, L.cell - 8, L.cell * 0.18); ctx.stroke(); };
+          fl.rows.forEach(function (i) { for (var j = 0; j < N; j++) hl(i, j); });
+          fl.cols.forEach(function (i) { for (var j = 0; j < N; j++) hl(j, i); });
+          ctx.restore();
+        }
       }
     }
 
@@ -513,16 +582,29 @@
   var soundBtn = document.getElementById("vbSound");
   function syncSound() { soundBtn.textContent = audio.muted ? "🔇" : "🔊"; soundBtn.setAttribute("aria-pressed", audio.muted ? "false" : "true"); soundBtn.setAttribute("aria-label", audio.muted ? "Sesi aç" : "Sesi kapat"); }
   soundBtn.addEventListener("click", function () { audio.muted = !audio.muted; store(MUTE_KEY, audio.muted ? "1" : "0"); syncSound(); if (!audio.muted) sfx.pick(); });
-  document.getElementById("vbRestart").addEventListener("click", function () { if (st.score > 0 && !st.over && !window.confirm("Mevcut oyun silinip yeni oyun başlatılsın mı?")) return; selected = -1; newGame(); });
+  /* Üst bar: ? (nasıl oynanır + renk açıklamaları) ve ↻ (onaylı yeniden başlat) */
+  function openModal(id) { var m = document.getElementById(id); m.hidden = false; var b = m.querySelector("button"); if (b) b.focus(); }
+  function closeModal(id) { document.getElementById(id).hidden = true; }
+  document.getElementById("vbHelpBtn").addEventListener("click", function () { openModal("vbHelp"); });
+  document.getElementById("vbHelpClose").addEventListener("click", function () { closeModal("vbHelp"); });
+  document.getElementById("vbRestart").addEventListener("click", function () {
+    if (!st.over && (st.score > 0 || st.moves > 0)) { openModal("vbConfirm"); return; }
+    selected = -1; newGame();
+  });
+  document.getElementById("vbConfirmYes").addEventListener("click", function () { closeModal("vbConfirm"); selected = -1; newGame(); });
+  document.getElementById("vbConfirmNo").addEventListener("click", function () { closeModal("vbConfirm"); });
+  ["vbHelp", "vbConfirm"].forEach(function (id) { document.getElementById(id).addEventListener("click", function (e) { if (e.target.id === id) closeModal(id); }); });
   document.getElementById("vbAgain").addEventListener("click", function () { selected = -1; newGame(); });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { selected = -1; requestRender(); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") { selected = -1; closeModal("vbHelp"); closeModal("vbConfirm"); requestRender(); } });
 
   /* Test ve hata ayıklama için küçük, salt-okunur durum özeti */
   window.VitaBlock = {
-    state: function () { return st ? { board: st.board.map(function (r) { return r.slice(); }), tray: st.tray.map(function (p) { return p && { cells: p.cells, w: p.w, h: p.h, kind: p.kind }; }), score: st.score, moves: st.moves, over: st.over } : null; },
+    state: function () { return st ? { board: st.board.map(function (r) { return r.slice(); }), tray: st.tray.map(function (p) { return p && { cells: p.cells, w: p.w, h: p.h, kind: p.kind }; }), score: st.score, moves: st.moves, over: st.over, toxWarn: st.toxWarn ? { r: st.toxWarn.r, c: st.toxWarn.c } : null, toxLeft: toxLeft() } : null; },
     layout: function () { return { bx: L.bx, by: L.by, cell: L.cell, ty: L.ty, th: L.th, W: L.W, H: L.H, dpr: L.dpr }; },
-    _debugSet: function (board, tray, moves) { if (board) st.board = board; if (tray) st.tray = tray; if (moves !== undefined) st.moves = moves; st.streak = 0; st.over = false; closeOver(); save(); ui.score(); checkOver(); requestRender(); },
-    place: function (i, r, c) { return place(i, r, c); }
+    _debugSet: function (board, tray, moves) { if (board) st.board = board; if (tray) st.tray = tray; if (moves !== undefined) st.moves = moves; st.streak = 0; st.over = false; st.toxWarn = null; closeOver(); save(); ui.score(); checkOver(); requestRender(); },
+    place: function (i, r, c) { return place(i, r, c); },
+    _newTray: function () { newTray(); requestRender(); return st.tray.map(function (p) { return p && { cells: p.cells, w: p.w, h: p.h, kind: p.kind, fits: fitsAnywhere(st.board, p) }; }); },
+    _pickToxCell: function () { return pickToxCell(); }
   };
 
   /* ---------------- Başlat ---------------- */
