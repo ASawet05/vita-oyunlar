@@ -32,3 +32,6 @@ Oyunlar eğlence ve genel bilgi amaçlıdır; tıbbi tavsiye yerine geçmez.
 VitaKelime (vitakelime.html → css/vitakelime.css, js/vitakelime.js + js/kelime/{motor,ses}.js): kelime çarkı + kesişen bulmaca.
 Sözlük data/turkce-sozluk.json (3.000+ büyük harfli Türkçe kelime, tr-TR dönüşümü; sağlık/vitamin terimleri "saglik" listesinde).
 Bölümler js/kelime/motor.js ile prosedürel üretilir; oynanan kökler localStorage'da (vo_kelime_v1) tutulur ve tekrar edilmez.
+
+VitaLingo (vitalingo.html → css/vitalingo.css, js/vitalingo.js + js/lingo/ses.js): ilk harfi verilen kelimeyi 5 tahminde bulma; 4/5/6 harf.
+Cevaplar data/turkce-sozluk.json içinden seçilir; tahmin kabulü için ek liste data/lingo-kabul.json. Kayıt localStorage vo_lingo_v1 (kullanılan kelimeler tekrar sorulmaz).
