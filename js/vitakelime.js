@@ -215,6 +215,7 @@ function checkDone() {
   const bonus = C.level % 3 === 0 ? 1 : 0; P.hints += bonus;
   sfx.win(); save();
   setTimeout(() => {
+    if (P.cur !== C || !C.done) return;   // bu arada sonraki bölüme geçildiyse eski kartı açma
     $("vkDoneTitle").textContent = C.data.health ? "Sağlık Bölümü Tamam!" : "Harika!";
     $("vkDoneLevel").textContent = String(C.level);
     $("vkDoneWords").textContent = String(C.data.words.length);
