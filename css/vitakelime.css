@@ -14,8 +14,8 @@ html,body.vk-body{height:100%;overflow:hidden;overscroll-behavior:none}
 .vk-back:focus-visible,.vk-icon:focus-visible,.vk-piggy:focus-visible,.vk-hintbtn:focus-visible,.vk-shuffle:focus-visible{outline:3px solid #fde047;outline-offset:2px}
 
 .vk-main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:6px 10px max(10px,env(safe-area-inset-bottom))}
-.vk-board{position:relative;flex:1 1 auto;min-height:120px;display:flex;align-items:center;justify-content:center}
-.vk-grid{display:grid;grid-template-columns:repeat(var(--cols,5),var(--cs,40px));grid-template-rows:repeat(var(--rows,5),var(--cs,40px));gap:4px}
+.vk-board{position:relative;flex:1 1 0;min-height:120px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.vk-grid{display:grid;grid-template-columns:repeat(var(--cols,5),var(--cs,40px));grid-template-rows:repeat(var(--rows,5),var(--cs,40px));gap:var(--gap,4px);transform-origin:center}
 .vk-void{visibility:hidden}
 .vk-cell{position:relative;display:flex;align-items:center;justify-content:center;border-radius:calc(var(--cs) * .22);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 6px 14px -10px rgba(0,0,0,.8);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .vk-cell span{font-size:calc(var(--cs) * .55);font-weight:900;color:#0f172a;opacity:0;transform:scale(.4);transition:opacity .2s,transform .25s}
@@ -103,3 +103,25 @@ html,body.vk-body{height:100%;overflow:hidden;overscroll-behavior:none}
 }
 @media (max-width:360px){.vk-controls{grid-template-columns:48px 1fr 48px;gap:4px}.vk-piggy,.vk-hintbtn{width:46px}}
 @media (prefers-reduced-motion:reduce){.vk-cell.is-pop,.vk-wheel.is-spin,.vk-preview.is-shake,.vk-confetti i,.vk-done-emoji{animation:none}}
+
+/* Kademe rozeti + seviye atlama bildirimi */
+.vk-tier{display:inline-block;margin-top:2px;padding:1px 8px;border-radius:999px;font-size:10.5px;font-weight:900;letter-spacing:.02em;background:rgba(94,234,212,.14);border:1px solid rgba(94,234,212,.45);color:#99f6e4}
+.vk-tier[data-tier="2"]{background:rgba(56,189,248,.14);border-color:rgba(125,211,252,.5);color:#bae6fd}
+.vk-tier[data-tier="3"]{background:rgba(250,204,21,.14);border-color:rgba(253,224,71,.5);color:#fef08a}
+.vk-tier[data-tier="4"]{background:rgba(249,115,22,.16);border-color:rgba(253,186,116,.55);color:#fed7aa}
+.vk-tier[data-tier="5"]{background:linear-gradient(90deg,rgba(168,85,247,.3),rgba(236,72,153,.3));border-color:rgba(240,171,252,.6);color:#fae8ff}
+.vk-tierup{position:fixed;inset:0;z-index:12;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.vk-tierup[hidden]{display:none}
+.vk-tierup-in{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 26px;border-radius:24px;text-align:center;background:linear-gradient(160deg,rgba(15,23,42,.92),rgba(49,46,129,.9));border:1px solid rgba(253,224,71,.6);box-shadow:0 0 50px -10px rgba(250,204,21,.6),0 24px 60px -24px rgba(0,0,0,.9);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.vk-tierup.is-on .vk-tierup-in{animation:vk-tierup 2.8s ease forwards}
+.vk-tierup-ico{font-size:40px;line-height:1}
+.vk-tierup b{font-size:22px;font-weight:900;color:#fde047;letter-spacing:.02em}
+.vk-tierup strong{font-size:16px;font-weight:900;color:#fff}
+.vk-tierup-name{padding:2px 12px;border-radius:999px;background:rgba(94,234,212,.2);border:1px solid rgba(94,234,212,.5);font-size:12px;font-weight:900;color:#99f6e4}
+.vk-tierup small{font-size:12px;color:#cbd5e1;font-weight:700}
+@keyframes vk-tierup{0%{opacity:0;transform:scale(.5) rotate(-4deg)}12%{opacity:1;transform:scale(1.08) rotate(1deg)}20%{transform:scale(1)}82%{opacity:1}100%{opacity:0;transform:translateY(-20px) scale(.96)}}
+@media (prefers-reduced-motion:reduce){.vk-tierup.is-on .vk-tierup-in{animation:none}}
+
+/* Başlık sabit yükseklikte kalsın (satır kayması ızgara alanını değiştirmesin) */
+.vk-lvl,.vk-tier{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vk-tier{display:inline-block}

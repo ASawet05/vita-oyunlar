@@ -2,7 +2,7 @@
    Sözlük: data/turkce-sozluk.json · Bulmaca üretimi: js/kelime/motor.js (her bölüm prosedürel, kökler tekrar etmez).
    Girdi: dokunma/fare ile çarkta harfleri sürükle (geri giderek harf bırak); klavye: harfleri yaz, Enter gönder,
    Backspace sil, Boşluk karıştır, H ipucu. Tüm ilerleme localStorage'da (yalnızca bu cihazda). */
-import { createEngine, trUpper, letters } from "./kelime/motor.js";
+import { createEngine, trUpper, letters, difficulty } from "./kelime/motor.js";
 import { createAudio } from "./kelime/ses.js";
 
 const $ = (id) => document.getElementById(id);
@@ -38,11 +38,30 @@ async function init() {
 }
 function newLevel() {
   const seed = (Date.now() ^ (P.level * 2654435761)) >>> 0;
-  let data = E.generate(P.level, { played: new Set(P.played), recent: new Set(P.recent.slice(-150)), seed });
-  if (!data) { P.played = P.played.slice(-60); data = E.generate(P.level, { played: new Set(P.played), recent: new Set(P.recent.slice(-150)), seed }); }  // tüm kökler oynandıysa döngü
+  const recent = new Set(P.recent.slice(-150));
+  // 1) Kademe şartlarını tam sağlayan, hiç oynanmamış kök  2) yoksa en eski oynanmış kökler yeniden kullanılabilir (son 150 hariç)
+  //    — ileri seviyede bulmacalar kolaylaşmaz  3) son çare: şartlar gevşetilir
+  let data = E.generate(P.level, { played: new Set(P.played), recent, seed, strict: true })
+    || E.generate(P.level, { played: new Set(P.played.slice(-150)), recent, seed, strict: true })
+    || E.generate(P.level, { played: new Set(P.played.slice(-60)), recent, seed });
+  if (P.played.length > 1500) P.played = P.played.slice(-600);
   P.cur = { level: P.level, seed, data, open: [], hintOpen: [], found: [], extras: [], order: data.letters.map((_, i) => i), done: false };
   P.played.push(data.root); P.recent.push(...data.words.map(w => w.w)); if (P.recent.length > 400) P.recent = P.recent.slice(-300);
+  // Kademe yükseldiyse "Seviye Atladın!" rozeti
+  const T = difficulty(P.level), seen = P.tierSeen || 1;
+  const up = T.tier > seen; P.tierSeen = Math.max(seen, T.tier);
   save(); build(true);
+  if (up) tierBadge(T); else $("vkTierUp").hidden = true;
+}
+let tierUps = 0;
+function tierBadge(T) {
+  const lens = T.lens.length > 1 ? Math.min(...T.lens) + "-" + Math.max(...T.lens) : T.lens[0];
+  $("vkTierName").textContent = T.name;
+  $("vkTierText").textContent = `Artık ${lens} Harfli Bulmacalar`;
+  $("vkTierSub").textContent = `Izgarada ${T.min}-${T.max} kelime${T.sparse ? " · daha az ortak harf" : ""}`;
+  const b = $("vkTierUp"); b.hidden = false; b.classList.remove("is-on"); void b.offsetWidth; b.classList.add("is-on");
+  sfx.piggy(); tierUps++;
+  clearTimeout(b._t); b._t = setTimeout(() => { b.hidden = true; }, 2800);
 }
 function restore() { build(false); }
 
@@ -53,6 +72,7 @@ let cellEls = new Map();
 function build(fresh) {
   const C = P.cur, D = C.data, grid = $("vkGrid");
   $("vkLevel").textContent = String(C.level);
+  { const T = difficulty(C.level), n = letters(D.root).length; $("vkTier").textContent = `${T.name} · ${n} harf`; $("vkTier").dataset.tier = T.tier; }
   $("vkHealth").hidden = !D.health;
   grid.style.setProperty("--cols", D.w); grid.style.setProperty("--rows", D.h);
   grid.innerHTML = ""; cellEls = new Map();
@@ -69,19 +89,25 @@ function build(fresh) {
     grid.appendChild(el);
   }
   grid.setAttribute("aria-label", `Bulmaca: ${D.words.length} kelime, ${C.found.length} bulundu`);
-  buildWheel(); fit(); renderHud();
+  buildWheel(); renderHud(); fit(); requestAnimationFrame(() => requestAnimationFrame(fit));   // başlık/HUD yerleştikten sonra yeniden ölç
   $("vkDone").hidden = !C.done;
   if (fresh) toast(D.health ? `🩺 Sağlık Bölümü ${C.level}` : `Bölüm ${C.level}`, "level");
 }
 function fit() {
   const C = P.cur; if (!C) return;
   const board = $("vkBoard"), grid = $("vkGrid"), D = C.data;
-  const gap = 4, w = board.clientWidth - 12, h = board.clientHeight - 12;
-  const cs = Math.max(18, Math.min(56, Math.floor((w - gap * (D.w - 1)) / D.w), Math.floor((h - gap * (D.h - 1)) / D.h)));
-  grid.style.setProperty("--cs", cs + "px");
+  // Duyarlı hücre boyutu: hücre + aralık birlikte küçülür; çok sıkışırsa ızgara bütün olarak ölçeklenir (taşma yok)
+  const w = board.clientWidth - 8, h = board.clientHeight - 8;
+  let cs = Math.min(56, w / (D.w * 1.08), h / (D.h * 1.08));
+  let gap = Math.max(2, Math.round(cs * 0.08));
+  cs = Math.floor(Math.min(56, (w - gap * (D.w - 1)) / D.w, (h - gap * (D.h - 1)) / D.h));
+  let scale = 1;
+  if (cs < 16) { scale = cs / 16; cs = 16; gap = 2; }
+  grid.style.setProperty("--cs", cs + "px"); grid.style.setProperty("--gap", gap + "px");
+  grid.style.transform = scale < 1 ? `scale(${scale.toFixed(3)})` : "";
   layoutWheel();
 }
-new ResizeObserver(() => fit()).observe(document.body);
+{ const ro = new ResizeObserver(() => fit()); ro.observe(document.body); ro.observe($("vkBoard")); }
 
 /* ---------------- Harf çarkı ---------------- */
 const wheel = $("vkWheel"), svg = $("vkLines");
@@ -298,7 +324,7 @@ init();
 
 /* Test ve hata ayıklama */
 window.VitaKelime = {
-  state: () => ({ level: P.level, hints: P.hints, piggy: P.piggy, played: P.played.length, root: P.cur && P.cur.data.root, words: P.cur && P.cur.data.words.map(p => p.w), found: P.cur ? P.cur.found.slice() : [], extras: P.cur ? P.cur.data.extras.slice() : [], extrasFound: P.cur ? P.cur.extras.slice() : [], open: P.cur ? P.cur.open.length : 0, done: !!(P.cur && P.cur.done), wheel: btns.map(b => b.textContent), ready: !!E, stats: { ...P.stats } }),
+  state: () => ({ tierUps, tier: difficulty(P.level).tier, tierSeen: P.tierSeen || 1, badge: !$("vkTierUp").hidden, gridFits: (() => { const g = $("vkGrid").getBoundingClientRect(), b = $("vkBoard").getBoundingClientRect(); return g.left >= b.left - 1 && g.right <= b.right + 1 && g.top >= b.top - 1 && g.bottom <= b.bottom + 1; })(), level: P.level, hints: P.hints, piggy: P.piggy, played: P.played.length, root: P.cur && P.cur.data.root, words: P.cur && P.cur.data.words.map(p => p.w), found: P.cur ? P.cur.found.slice() : [], extras: P.cur ? P.cur.data.extras.slice() : [], extrasFound: P.cur ? P.cur.extras.slice() : [], open: P.cur ? P.cur.open.length : 0, done: !!(P.cur && P.cur.done), wheel: btns.map(b => b.textContent), ready: !!E, stats: { ...P.stats } }),
   letterCenter: (ch, nth = 0) => { const r = wheel.getBoundingClientRect(); const list = btns.filter(b => b.textContent === ch); const b = list[nth]; return b ? { x: r.left + b._x, y: r.top + b._y } : null; },
   btnCenter: (i) => { const r = wheel.getBoundingClientRect(), b = btns[i]; return b ? { x: r.left + b._x, y: r.top + b._y } : null; },
   set: (patch) => { Object.assign(P, patch); save(); renderHud(); },

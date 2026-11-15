@@ -16,6 +16,7 @@
   <div class="vk-title">
     <b>VitaKelime</b>
     <span class="vk-lvl">Bölüm <b id="vkLevel">1</b> · <span id="vkProgress">0/0</span><span class="vk-health" id="vkHealth" hidden>🩺 Sağlık</span></span>
+    <span class="vk-tier" id="vkTier" data-tier="1">Başlangıç · 4 harf</span>
   </div>
   <button type="button" class="vk-icon" id="vkSound" aria-pressed="true" aria-label="Sesi kapat">🔊</button>
 </header>
@@ -45,6 +46,9 @@
 </main>
 
 <div class="vk-confetti" id="vkConfetti" aria-hidden="true"></div>
+<div class="vk-tierup" id="vkTierUp" hidden role="status" aria-live="polite">
+  <div class="vk-tierup-in"><span class="vk-tierup-ico" aria-hidden="true">🏅</span><b>Seviye Atladın!</b><strong id="vkTierText"></strong><span class="vk-tierup-name" id="vkTierName"></span><small id="vkTierSub"></small></div>
+</div>
 
 <div class="vk-overlay" id="vkLoading"><div class="vk-card vk-card--small"><div class="vk-spin" aria-hidden="true"></div><p>Sözlük yükleniyor…</p></div></div>
 <div class="vk-overlay" id="vkError" hidden><div class="vk-card vk-card--small"><h2>Sözlük yüklenemedi</h2><p>Bağlantınızı kontrol edip yeniden deneyin.</p><button type="button" class="vo-btn" id="vkRetry">↻ Yeniden dene</button></div></div>

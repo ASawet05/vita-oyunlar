@@ -13,16 +13,15 @@ export const letters = (w) => Array.from(w);
 export function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const shuffle = (arr, r) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
-/* Zorluk eğrisi: [çark uzunlukları, hedef kelime sayısı (min, max)] */
-export function difficulty(level) {
-  if (level <= 2) return { lens: [4], min: 3, max: 4 };
-  if (level <= 6) return { lens: [4, 5], min: 4, max: 5 };
-  if (level <= 14) return { lens: [5], min: 4, max: 5 };
-  if (level <= 25) return { lens: [5, 6], min: 5, max: 6 };
-  if (level <= 40) return { lens: [6], min: 6, max: 7 };
-  if (level <= 60) return { lens: [6, 7], min: 6, max: 8 };
-  return { lens: [7, 6, 7], min: 7, max: 9 };
-}
+/* Kademeli zorluk eğrisi (seviye sistemi). extra: kökten çıkabilecek en az ekstra kelime; sparse: az ortak harfli kesişimler */
+export const TIERS = [
+  { tier: 1, from: 1, to: 3, name: "Başlangıç", lens: [4], min: 3, max: 4, extra: 1, maxSide: 7 },
+  { tier: 2, from: 4, to: 7, name: "Kolay-Orta", lens: [5], min: 5, max: 6, extra: 2, maxSide: 8 },
+  { tier: 3, from: 8, to: 12, name: "Orta", lens: [6], min: 6, max: 8, extra: 2, maxSide: 10 },
+  { tier: 4, from: 13, to: 18, name: "Zor", lens: [7], min: 8, max: 10, extra: 2, maxSide: 11 },
+  { tier: 5, from: 19, to: Infinity, name: "Usta", lens: [7, 8], min: 9, max: 12, extra: 3, maxSide: 12, sparse: true }
+];
+export function difficulty(level) { return TIERS.find(t => level >= t.from && level <= t.to) || TIERS[TIERS.length - 1]; }
 
 export function createEngine(dict) {
   const all = [];
@@ -50,7 +49,7 @@ export function createEngine(dict) {
   }
 
   /* ---- Bulmaca ızgarası yerleşimi ---- */
-  function layout(words, r, maxSide) {
+  function layout(words, r, maxSide, sparse) {
     // words: yerleştirilecek adaylar (ilk eleman kök — her zaman yatay ilk sırada)
     let best = null;
     for (let attempt = 0; attempt < 24; attempt++) {
@@ -94,7 +93,7 @@ export function createEngine(dict) {
               if (cr > 0) {
                 const b = bounds({ w, x, y, dir });
                 if (b.w > maxSide || b.h > maxSide) continue;
-                cands.push({ x, y, dir, score: cr * 6 - b.w * b.h * 0.08 - Math.abs(b.w - b.h) * 0.6 + r() * 2 });
+                cands.push({ x, y, dir, score: (sparse ? (cr === 1 ? 6 : 6 - (cr - 1) * 5) : cr * 6) - b.w * b.h * 0.08 - Math.abs(b.w - b.h) * 0.6 + r() * 2 });
               }
             }
           });
@@ -125,53 +124,49 @@ export function createEngine(dict) {
     return out;
   }
 
-  const rootPool = {};   // uzunluk → yeterli alt kelimesi olan kökler
-  function poolFor(n, min) {
-    const k = n + ":" + min;
-    if (!rootPool[k]) rootPool[k] = (byLen[n] || []).filter(w => subwords(w).length >= min + 1);
+  const rootPool = {};   // uzunluk:gereken → yeterince zengin kökler (ızgara + ekstra kadar alt kelime)
+  function poolFor(n, need) {
+    const k = n + ":" + need;
+    if (!rootPool[k]) rootPool[k] = (byLen[n] || []).filter(w => subwords(w).length >= need);
     return rootPool[k];
   }
 
-  /* Bölüm üret. opts: { played:Set(kökler), recent:Set(son kelimeler), seed } */
+  /* Bölüm üret. opts: { played:Set(kökler), recent:Set(son kelimeler), seed, strict } — strict: kademe şartları gevşetilmez (bulunamazsa null) */
   function generate(level, opts = {}) {
     const played = opts.played || new Set(), recent = opts.recent || new Set();
     const r = rng(opts.seed != null ? opts.seed : (level * 2654435761) >>> 0);
-    const D = difficulty(level), maxSide = level <= 6 ? 7 : level <= 25 ? 9 : 10;
-    for (let relax = 0; relax < 4; relax++) {
-      const min = Math.max(3, D.min - relax), maxW = D.max;
-      const healthLevel = level % 10 === 0;   // her 10. bölüm: Sağlık Bölümü (kök bir sağlık/vitamin terimi)
-      const lens = shuffle(D.lens, r).concat(healthLevel && level >= 30 ? [8] : []).concat(relax >= 2 ? [5, 6, 7, 4] : []);
-      if (healthLevel && relax < 2) lens.sort((a, b) => b - a);
+    const D = difficulty(level), healthLevel = level % 10 === 0;   // her 10. bölüm: Sağlık Bölümü
+    for (let relax = 0; relax < (opts.strict ? 1 : 5); relax++) {
+      const min = Math.max(3, D.min - relax), extraMin = Math.max(1, D.extra - (relax >= 2 ? 1 : 0)), maxW = D.max;
+      const lens = shuffle(D.lens, r).concat(relax >= 3 ? D.lens.map(n => n - 1).filter(n => n >= 4) : []);
       for (const n of lens) {
-        let pool = poolFor(n, min).filter(w => !played.has(w));
-        if (healthLevel && relax < 2) { const hp = pool.filter(w => health.has(w)); if (hp.length) pool = hp; else if (n === 8) continue; }
-        else if (n === 8) continue;
+        let pool = poolFor(n, min + extraMin).filter(w => !played.has(w));
+        if (healthLevel && relax < 2) { const hp = pool.filter(w => health.has(w)); if (hp.length) pool = hp; }
         if (!pool.length) continue;
-        const tries = shuffle(pool, r).slice(0, 40);
-        let bestLevel = null;
-        for (const root of tries) {
-          const subs = subwords(root).filter(w => w !== root);
-          // Seçim: önce son bölümlerde kullanılmamışlar, karışık uzunluklar; sağlık terimlerine küçük öncelik
+        for (const root of shuffle(pool, r).slice(0, 30)) {
+          const all = subwords(root), subs = all.filter(w => w !== root);
+          // Izgaraya en fazla (toplam − ekstraMin) kelime; hedef sayı kademe aralığında rastgele
+          const target = Math.min(maxW, min + Math.floor(r() * (maxW - min + 1)), all.length - extraMin);
+          if (target < min) continue;
           const scored = subs.map(w => ({ w, s: (recent.has(w) ? -5 : 0) + (health.has(w) ? 1.2 : 0) + lenOf(w) * 0.35 + r() * 1.5 }));
           scored.sort((a, b) => b.s - a.s);
-          const cand = [root].concat(scored.slice(0, maxW + 4).map(o => o.w));
-          const lay = layout(cand, r, maxSide);
+          const cand = [root].concat(scored.slice(0, target + 4).map(o => o.w));
+          const lay = layout(cand, r, D.maxSide, D.sparse);
           if (!lay) continue;
-          // Hedeften fazlaysa kırp: kökü ve kesişmeleri koruyarak yeniden yerleştir
           let finalLay = lay;
-          if (lay.placed.length > maxW) finalLay = layout(lay.placed.slice(0, maxW).map(p => p.w).sort((a, b) => (a === root ? -1 : b === root ? 1 : 0)), r, maxSide) || lay;
+          if (lay.placed.length > target) finalLay = layout(lay.placed.slice(0, target).map(p => p.w).sort((a, b) => (a === root ? -1 : b === root ? 1 : 0)), r, D.maxSide, D.sparse) || lay;
+          if (finalLay.placed.length > target) continue;
           const count = finalLay.placed.length;
           if (count < min) continue;
           const gridWords = new Set(finalLay.placed.map(p => p.w));
-          const lv = {
-            level, root, health: health.has(root), letters: (() => { let L = shuffle(letters(root), r), k = 0; while (L.join("") === root && k++ < 5) L = shuffle(L, r); return L; })(), w: finalLay.w, h: finalLay.h,
-            words: finalLay.placed.sort((a, b) => a.y - b.y || a.x - b.x),
-            extras: subwords(root).filter(w => !gridWords.has(w))
+          const extras = all.filter(w => !gridWords.has(w));
+          if (extras.length < extraMin) continue;
+          return {
+            level, root, tier: D.tier, tierName: D.name, health: health.has(root),
+            letters: (() => { let L = shuffle(letters(root), r), k = 0; while (L.join("") === root && k++ < 5) L = shuffle(L, r); return L; })(),
+            w: finalLay.w, h: finalLay.h, words: finalLay.placed.sort((a, b) => a.y - b.y || a.x - b.x), extras
           };
-          if (!bestLevel || count > bestLevel.words.length) bestLevel = lv;
-          if (count >= Math.min(maxW, min + 1) || count >= min) break;
         }
-        if (bestLevel) return bestLevel;
       }
     }
     return null;
