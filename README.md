@@ -11,12 +11,12 @@ css/ortak.css     Ortak tasarım (VitaTakip renkleri, üst bar, kartlar, pencere
 oyun1.html        Vitamin Hafıza Eşleştirme   → css/oyun1.css, js/oyun1.js
 oyun2.html        Sağlıklı Sepet (refleks)     → css/oyun2.css, js/oyun2.js
 vitablock.html    VitaBlock (8x8 blok bulmaca) → css/vitablock.css, js/vitablock.js
-damar-kosucusu.html  Damar Yolu Koşucusu (3D)  → css/damar-kosucusu.css, js/damar-kosucusu.js + js/damar/*.js (ES modülleri)
+damar-kosucusu.html  Damar Yolu Koşucusu  → css/damar-kosucusu.css, js/damar-kosucusu.js + js/damar/{ayar,cizim,ses,kayit}.js (ES modülleri, dış kütüphane yok)
 vucut-savunmasi.html Vücut Savunması (strateji) → css/vucut-savunmasi.css, js/vucut-savunmasi.js + js/vucut/*.js (ES modülleri)
 ```
 
-Damar Yolu Koşucusu, Three.js r160'ı jsDelivr CDN'inden (sabit sürüm) yükler; diğer oyunlar tamamen bağımsızdır.
-Damar Yolu Koşucusu: su damlaları yalnızca para birimidir; turkuaz enerji kapsülleri kaykay şarjını doldurur. İlerleme (damla bankası, VitaMağaza alımları, güçlendirici yükseltmeleri, görevler/çarpan, günlük kelime, Gizemli Kapsül, Altın DNA) yalnızca bu cihazda localStorage'da `vo_damar_profile_v1` anahtarıyla saklanır (js/damar/kayit.js); mağaza arayüzü js/damar/magaza.js.
+Tüm oyunlar dış kütüphane kullanmaz; çevrimdışı da çalışır.
+Damar Yolu Koşucusu: Canvas 2D sözde-3D motor (tam ekran, DPR ölçekli; klavye + kaydırma/çift dokunma). İlerleme (Vita-Puan, rekor, karakterler, kapsül tasarımları, kapsül stoğu, ses) yalnızca bu cihazda localStorage'da `vo_damar_v2` anahtarıyla saklanır (js/damar/kayit.js); eski `vo_damar_profile_v1` damla bankası ilk açılışta Vita-Puan'a taşınır. Test kancası: `window.DamarKosucusu`.
 
 ```
 ```

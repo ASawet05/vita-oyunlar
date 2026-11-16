@@ -1,590 +1,427 @@
-/* Damar Yolu Koşucusu — ana modül.
-   Kurallar: su damlaları yalnızca para birimi; turkuaz enerji kapsülleri sağ üstteki kaykay şarjını doldurur (10 = %100);
-   kaykay (çift dokunuş / çift tık / Boşluk / E) önden çarpmada engeli parçalayıp tükenir; başlangıçta Toksin Hücresi
-   kısa süre kovalar; yan sürtme = sersemleme yıldızları + Toksin enseden takip, 6 sn içinde ikinci hata = yakalanma;
-   kafa kafaya çarpma = anında son. Sabit/rampalı ve karşıdan gelen hareketli Biyo-Kapsül trenleri, çatı koşusu,
-   havada aşağı kaydırma = hızlı iniş + şok dalgası, her 150 m'de hızlanma, VitaMağaza ve güçlendirici yükseltmeleri.
-   Three.js resmi CDN'den (sabit sürüm) yüklenir; dünya, karakter, nesneler, ses, kayıt ve mağaza ayrı modüllerdedir. */
-import { createAudio } from "./damar/ses.js";
-import { createWorld, LANES } from "./damar/dunya.js";
-import { createRunner } from "./damar/karakter.js";
-import { createObjects, makeRowPattern, buildMicrobe, OB, CAPSULE } from "./damar/nesneler.js";
-import { loadProfile, saveProfile, bumpMission, upgDuration } from "./damar/kayit.js";
-import { createMenu } from "./damar/magaza.js";
+/* Damar Yolu Koşucusu — oyun mantığı: 3 şeritli sonsuz koşu, çok katmanlı parkur, ritmik engel dalgaları,
+   tökezleme + toksin dalgası, Biyo-Sörf Kapsülü, Biyo-Frenzy, güçlendiriciler, Biyo-Mağaza, klavye + dokunmatik.
+   Çizim: js/damar/cizim.js · Ses: js/damar/ses.js · Kayıt: js/damar/kayit.js · Veri: js/damar/ayar.js */
+import { LW, LANES, PLAT_H, PLAYER_H, GRAV, JUMP_V, SUPER_V, TRAMP_V, SLIDE_T, BUFFER_T, CHASE_T, SHIELD_T, FRENZY_T, FRENZY_N, POWER_T,
+  SPEED0, SPEED_MAX, SPEED_PER_M, ZONE_LEN, VITAMINS, VIT_KEYS, POWERS, CHARS, CAPS, STOCK_PRICE, STOCK_MAX, MISSIONS, MISSION_BONUS } from "./damar/ayar.js";
+import { createRenderer, drawCharIcon } from "./damar/cizim.js";
+import { Ses } from "./damar/ses.js";
+import { loadProfile, saveProfile } from "./damar/kayit.js";
 
-const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-const $ = (id) => document.getElementById(id);
-const BEST_KEY = "vo_damar_best", MUTE_KEY = "vo_damar_muted";
+const $ = id => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
 
-function fatal(msg) { const f = $("dkFatal"); if (f) { f.hidden = false; f.querySelector("p").textContent = msg; } const s = $("dkStart"); if (s) s.hidden = true; }
-let THREE;
-try { THREE = await import(THREE_URL); } catch (e) { fatal("3D motoru (Three.js) yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin."); throw e; }
-
-/* ---------------- Sahne ---------------- */
-const canvas = $("dkCanvas"), stage = $("dkStage");
-let renderer;
-try { renderer = new THREE.WebGLRenderer({ canvas, antialias: (window.devicePixelRatio || 1) < 2, powerPreference: "high-performance" }); }
-catch (e) { fatal("Bu tarayıcı/cihaz 3D grafik (WebGL) desteklemiyor."); throw e; }
-const MAX_PR = Math.min(window.devicePixelRatio || 1, 2);
-let curPR = MAX_PR; renderer.setPixelRatio(curPR);
-/* Uyarlanabilir çözünürlük: koşu sırasında kare hızı düşükse piksel oranını kademeli düşür (en az 1), yükselirse geri al */
-let prAcc = 0, prFrames = 0;
-function adaptPR(dt) {
-  prAcc += dt; prFrames++;
-  if (prAcc < 2) return;
-  const fps = prFrames / prAcc; prAcc = 0; prFrames = 0;
-  let next = curPR;
-  if (fps < 42 && curPR > 1) next = Math.max(1, curPR - 0.25);
-  else if (fps > 57 && curPR < MAX_PR) next = Math.min(MAX_PR, curPR + 0.25);
-  if (next !== curPR) { curPR = next; renderer.setPixelRatio(curPR); resize(); }
-}
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 220);
-const world = createWorld(THREE, scene);
-const runner = createRunner(THREE); scene.add(runner.group);
-const objs = createObjects(THREE, scene);
-const sfx = createAudio(MUTE_KEY);
-
-// Dev Toksin Hücresi (kovalayan): prosedürel mikrop + sarı gözler. "!" uyarısı ekranın alt kenarında (HTML)
-const chaserMic = buildMicrobe(THREE, { r: 1.25, membrane: 0x4d7c0f, glow: 0x84cc16, nucleus: 0x6b21a8, tip: 0xc026d3, spikes: 30, tentacles: 7, eyes: true });
-const chaser = chaserMic.group;
-chaser.scale.setScalar(0.56); chaser.position.set(0, 0.5, 16); chaser.visible = false; scene.add(chaser);
-// Hızlı iniş şok dalgası halkası
-const shock = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.85, 40), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
-shock.rotation.x = -Math.PI / 2; shock.visible = false; scene.add(shock);
-let shockT = 0;
-const dangerEl = $("dkDanger"), dangerTxt = dangerEl.querySelector("span");
-let dangerShown = false;
-
-function resize() {
-  const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
-  renderer.setSize(w, h, false); camera.aspect = w / h; camera.fov = w / h < 0.75 ? 74 : 64; camera.updateProjectionMatrix();
-}
-new ResizeObserver(resize).observe(stage); window.addEventListener("resize", resize); resize();
-
-/* ---------------- Kayıt + mağaza ---------------- */
+const canvas = $("dkCanvas"), R = createRenderer(canvas);
 let profile = loadProfile();
-let applied = null;
-function applyLook() { applied = { char: profile.sel.char, acc: Object.assign({}, profile.sel.acc), board: profile.sel.board }; runner.setSkin(profile.sel.char); runner.setAccessories(profile.sel.acc); runner.setBoardType(profile.sel.board); }
-applyLook();
-const menu = createMenu({ getProfile: () => profile, sfx, onChange: () => { applyLook(); renderHud(true); }, toast: (t, k) => toast(t, k) });
-menu.renderHome();
+Ses.setOn(profile.sound);
 
-/* ---------------- Durum ---------------- */
-const G = 26, JUMP_V = 10.6, SUPER = 1.42, SPAWN_Z = -118, LEVEL_M = 150, CHARGE_MAX = 10, BOARD_T = 15, STUN_T = 6, INTRO_T = 2;
-let S;
-function fresh() {
-  return {
-    mode: "ready", t: 0, speed: 0, dist: 0, pts: 0, drops: 0, level: 1,
-    lane: 1, x: 0, y: 0, vy: 0, airborne: false, airT: 0, airDur: 2 * JUMP_V / G, noFlip: false, slideT: 0, slideK: 0, queuedSlide: false, slam: false,
-    charge: 0, magnetT: 0, jetT: 0, bootsT: 0, x2T: 0, boardT: 0, invulnT: 0, chaseT: 0, introT: 0, stumble: 0, chaserZ: 16,
-    untilRow: 30, prevPass: null, occ: [0, 0, 0], rowLog: [],
-    nextPowerAt: 140 + Math.random() * 100, nextLetterAt: 90 + Math.random() * 80, nextBoxAt: 450 + Math.random() * 300, nextChargeAt: 20 + Math.random() * 15,
-    gen: { caps: 0, flat: 0, moving: 0 }, plan: null, letterOut: false, crashT: 0, shake: 0, roofDist: 0, crashReason: "", final: null,
-    runStats: { jumps: 0, board: 0, power: 0, letters: 0 }
-  };
-}
-S = fresh();
-const best = () => { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch (_) { return 0; } };
-// Skor = mesafe puanı (2x çarpan aktifken iki kat) × kalıcı görev çarpanı. Damlalar skora değil bankaya gider.
-const score = () => S.final != null ? S.final : Math.floor(S.pts * profile.multiplier);
-const boardReady = () => S.mode === "run" && S.boardT <= 0 && (S.charge >= CHARGE_MAX || profile.boards > 0);
+const newPlayer = () => ({ lane: 1, prevLane: 1, x: 0, y: 0, vy: 0, ground: true, surf: 0, slideT: 0, tilt: 0, phase: 0, sqx: 1, sqy: 1, land: 0, stumbleT: 0, invT: 0, bufJump: 0, bufSlide: 0, laneT: 9 });
+const G = {
+  mode: "menu", t: 0, dt: 0.016, dist: 0, speed: 7, ents: [], parts: [], pops: [], trail: [], player: newPlayer(),
+  threat: 0, chaseT: 0, stumbled: false, shieldT: 0, frenzyT: 0, powers: { magnet: 0, spring: 0, x2: 0 }, streak: 0, lastGot: -9,
+  flash: 0, flashC: "rgba(255,255,255,A)", shake: 0, score: 0, vp: 0, vits: {}, baseMult: 1, genD: 0, lastPow: 0, lastPat: "",
+  mission: null, mProg: 0, mDone: false, zone: 0, char: profile.char, cap: profile.cap, deadT: 0, heartT: 0, seenBridge: false
+};
 
-/* ---------------- HUD ---------------- */
-let lastHud = "";
-function renderHud(force) {
-  const sc = score(), key = [sc, Math.floor(S.dist), S.drops, S.charge, Math.ceil(S.magnetT), Math.ceil(S.jetT), Math.ceil(S.bootsT), Math.ceil(S.x2T), Math.ceil(S.boardT), Math.ceil(S.chaseT), profile.boards, profile.multiplier, profile.word.got, S.mode].join("|");
-  if (!force && key === lastHud) return; lastHud = key;
-  $("dkScore").textContent = String(sc);
-  $("dkDist").textContent = Math.floor(S.dist) + " m";
-  $("dkDrops").textContent = String(S.drops);
-  $("dkBest").textContent = String(Math.max(best(), sc));
-  // Sol üst cam şerit: ikon + kalan saniye (tam ad title/aria-label'da)
-  const chip = (cls, icon, val, label) => `<span class="dk-chip dk-chip--${cls}" title="${label}" aria-label="${label}"><b aria-hidden="true">${icon}</b>${val}</span>`;
-  const chips = [chip("mult", "✖", profile.multiplier, `Skor çarpanı x${profile.multiplier}`)];
-  if (S.x2T > 0) chips.push(chip("x2", "2x", Math.ceil(S.x2T), `2x Skor ${Math.ceil(S.x2T)} sn`));
-  if (S.chaseT > 0) chips.push(chip("chase", "💫", Math.ceil(S.chaseT), `Sersem, Toksin peşinde ${Math.ceil(S.chaseT)} sn`));
-  if (S.boardT > 0) chips.push(chip("board", "🛹", Math.ceil(S.boardT), `Kaykay ${Math.ceil(S.boardT)} sn`));
-  if (S.jetT > 0) chips.push(chip("sun", "🚀", Math.ceil(S.jetT), `D3 Jet-Pack ${Math.ceil(S.jetT)} sn`));
-  if (S.bootsT > 0) chips.push(chip("boots", "🥾", Math.ceil(S.bootsT), `Mg Botları ${Math.ceil(S.bootsT)} sn`));
-  if (S.magnetT > 0) chips.push(chip("magnet", "🧲", Math.ceil(S.magnetT), `Fe Mıknatısı ${Math.ceil(S.magnetT)} sn`));
-  $("dkChips").innerHTML = chips.join("");
-  // Sağ üst: kaykay silüeti şarj barı (aşağıdan yukarı dolar)
-  const bb = $("dkBoardBtn"), pct = Math.round(S.charge / CHARGE_MAX * 100);
-  bb.style.setProperty("--fill", String(pct / 100));
-  bb.querySelector("b").textContent = String(profile.boards);
-  bb.querySelector("em").textContent = S.boardT > 0 ? Math.ceil(S.boardT) + " sn" : pct + "%";
-  bb.classList.toggle("is-ready", boardReady()); bb.classList.toggle("is-full", S.charge >= CHARGE_MAX); bb.classList.toggle("is-on", S.boardT > 0);
-  bb.disabled = !boardReady();
-  bb.setAttribute("aria-label", `Nano-Kaykay şarjı %${pct}, stok ${profile.boards}${boardReady() ? " — kullanmak için dokun (veya çift dokun / Boşluk / E)" : ""}`);
-  menu.renderWord($("dkWord"), profile.word);
-}
-function toast(text, tone) {
-  const box = $("dkToasts"), d = document.createElement("div");
-  d.className = "dk-toast" + (tone ? " dk-toast--" + tone : ""); d.textContent = text;
-  box.appendChild(d); while (box.children.length > 3) box.removeChild(box.firstChild);
-  setTimeout(() => d.remove(), 1900);
-}
-function mission(id, amount, runValue) {
-  const r = bumpMission(profile, id, amount, runValue);
-  r.done.forEach(() => { sfx.mission(); });
-  if (r.done.length) { toast("Görev tamamlandı! 🎯", "level"); saveProfile(profile); }
-  if (r.setDone) { toast(`Tüm görevler tamam! Skor çarpanı x${profile.multiplier}`, "turbo"); saveProfile(profile); }
-}
+/* ================= Parkur üretimi (adil, ritmik dalgalar) ================= */
+const add = e => { G.ents.push(e); return e; };
+const kindFor = () => pick(VIT_KEYS);
+function coins(lane, d0, n, { y = 0.95, step = 2.3, kind = kindFor(), rare = false } = {}) { for (let i = 0; i < n; i++) add({ t: "vit", lane, x: LANES[lane], y, d: d0 + i * step, kind, rare }); }
+function arc(lane, d0, span, peak, n, opt = {}) { const kind = opt.kind || kindFor(); for (let i = 0; i < n; i++) { const u = (i + 0.5) / n; add({ t: "vit", lane, x: LANES[lane], y: (opt.base ?? 0.95) + 4 * peak * u * (1 - u), d: d0 + span * u, kind, rare: !!opt.rare }); } }
+const others = l => [0, 1, 2].filter(x => x !== l);
+const react = () => Math.max(13, G.speed * 0.95);        // iki engel sırası arası en az tepki mesafesi
 
-/* ---------------- Oyun akışı ---------------- */
-function start() {
-  sfx.unlock(); objs.clear();
-  profile = loadProfile(); applyLook();
-  S = fresh(); S.mode = "run"; S.introT = INTRO_T; S.chaserZ = 2.5; runner.reset();
-  ["dkStart", "dkOver", "dkPause"].forEach(id => { $(id).hidden = true; }); menu.closeStore();
-  $("dkPauseBtn").disabled = false; lastHud = ""; renderHud(true);
-  for (let z = -46; z > SPAWN_Z; z -= 18) spawnRow(z, true);
-  sfx.chaser();
-}
-function goMenu() { S = fresh(); objs.clear(); profile = loadProfile(); applyLook(); menu.renderHome(); $("dkOver").hidden = true; $("dkStart").hidden = false; $("dkPauseBtn").disabled = true; renderHud(true); }
-function setPaused(p) {
-  if (S.mode !== "run" && S.mode !== "paused") return;
-  S.mode = p ? "paused" : "run"; $("dkPause").hidden = !p;
-  $("dkPauseBtn").textContent = p ? "▶" : "⏸"; $("dkPauseBtn").setAttribute("aria-label", p ? "Devam et" : "Duraklat");
-}
-function crash(reason) {
-  S.mode = "crashing"; S.crashT = 0; S.shake = 0.6; S.crashReason = reason || "front";
-  sfx.crash(); objs.burst(S.x, S.y + 1, 0, 0xef4444, 40, 1.4);
-  if (navigator.vibrate) try { navigator.vibrate([60, 40, 90]); } catch (_) {}
-}
-function gameOver() {
-  S.mode = "over";
-  const sc = score(), prev = best(), record = sc > prev;
-  S.final = sc;  // sonradan kazanılan çarpan bu koşunun skorunu değiştirmez
-  if (record) try { localStorage.setItem(BEST_KEY, String(sc)); } catch (_) {}
-  try { localStorage.setItem("vo_best_damar", Math.max(prev, sc) + " puan"); } catch (_) {}
-  profile.bank += S.drops; profile.stats.runs += 1; profile.stats.bestDist = Math.max(profile.stats.bestDist, Math.floor(S.dist));
-  mission("dist", 0, S.dist); mission("roof", Math.floor(S.roofDist));
-  saveProfile(profile); menu.renderHome();
-  $("dkOverTitle").textContent = S.crashReason === "chaser" ? "Toksin Hücresi Yakaladı!" : "Damar Tıkandı!";
-  $("dkOverDist").textContent = Math.floor(S.dist) + " m";
-  $("dkOverDrops").textContent = "+" + S.drops;
-  $("dkOverScore").textContent = String(sc);
-  $("dkOverBest").textContent = String(Math.max(prev, sc));
-  $("dkOverBank").textContent = String(profile.bank);
-  $("dkOverNote").textContent = (record ? "🎉 Yeni rekor! " : "") + `Skor çarpanı x${profile.multiplier}`;
-  $("dkOver").hidden = false; $("dkPauseBtn").disabled = true; $("dkAgain").focus();
-  renderHud(true);
-}
-
-/* ---------------- Sıra üretimi ---------------- */
-const rowZ = (r) => SPAWN_Z + (S.dist - r.at);
-/* Karşıdan gelen tren (ön yüzü z0'da, göreli hız vz), oyuncuya ulaşmadan önce yetiştiği sıraların
-   o şeridini kapatır. Yalnızca bu sıraların her birinde başka bir geçilebilir şerit varsa
-   ve önde aynı şeritte sabit tren yoksa üretilir (adil). */
-function canMoveTrain(lane, z0, vz) {
-  if (objs.list.some(o => o.alive && o.type === "capsule" && o.lane === lane && o.z - o.len / 2 < 2)) return false;
-  const sp = Math.max(10, S.speed);
-  return S.rowLog.every(r => {
-    const zr = rowZ(r);
-    if (zr > 1 || zr <= z0) return true;                       // geçilmiş ya da trenin arkasında
-    const tCatch = (zr - z0) / vz, tReach = -zr / sp;           // tren sıraya yetişir / sıra oyuncuya ulaşır
-    return tCatch > tReach + 0.4 || r.pass.some(l => l !== lane);
-  });
-}
-function spawnRow(z, warmup) {
-  // Hareketli tren planı: sonraki 2 sıra hedef şeridi boş bırakır (o sıralarda başka geçiş şeridi garanti), ardından tren gelir
-  if (!warmup && !S.plan && S.level >= 2 && Math.random() < Math.min(0.4, 0.1 + S.level * 0.035)) {
-    const cand = [0, 1, 2].filter(l => S.occ[l] <= 0);
-    if (cand.length) S.plan = { lane: cand[Math.floor(Math.random() * cand.length)], rows: 2 };
-  }
-  const occupied = S.occ.map(v => v > 0); if (S.plan) occupied[S.plan.lane] = true;
-  const pat = makeRowPattern(S.level, Math.random, S.prevPass, occupied);
-  S.prevPass = pat.pass;
-  S.rowLog = S.rowLog.filter(r => rowZ(r) < 4); S.rowLog.push({ at: S.dist - (z - SPAWN_Z), pass: pat.pass.slice() });
-  pat.lanes.forEach((type, l) => {
-    if (!type) return;
-    if (pat.moving && l === pat.moving.from) objs.spawn("virus", l, z, 0, { moving: { from: pat.moving.from, to: pat.moving.to, w: 1.3 + S.level * 0.12 } });
-    else objs.spawn(type, l, z);
-  });
-  const roofs = [];
-  pat.capsules.forEach(c => {
-    // Rampasız trenlerin bir kısmı karşıdan hızla gelir (seviye arttıkça daha sık)
-    const vzTry = Math.min(20, 8 + S.level * 1.2);
-    // Rampalı adaylar da seçilebilir; hareket edecek trenin rampası kaldırılır (karşıdan gelen trene rampa olmaz)
-    const moving = !warmup && S.level >= 2 && (!c.ramp || Math.random() < 0.5) && Math.random() < Math.min(0.6, 0.25 + S.level * 0.07) && canMoveTrain(c.lane, z, vzTry);
-    if (moving) c.ramp = false;
-    const vz = moving ? vzTry : 0;
-    if (!warmup) { S.gen.caps++; if (!c.ramp) S.gen.flat++; if (moving) S.gen.moving++; }
-    const o = objs.spawn("capsule", c.lane, z - c.len / 2, 0, { len: c.len, ramp: c.ramp, color: Math.floor(Math.random() * 4), vz });
-    S.occ[c.lane] = c.len + 6;
-    if (!moving) roofs.push(o);
-    // Çatı: yoğun su damlası dizisi (hareketli trende trenle birlikte gelir)
-    for (let d = c.len / 2 - 1.5; d > -c.len / 2 + 1; d -= 1.6) objs.spawn("drop", c.lane, o.z + d, CAPSULE.top + 0.6, moving ? { vz, ride: o } : {});
-  });
-  if (S.plan && --S.plan.rows <= 0) {
-    const L = S.plan.lane, len = 12 + Math.floor(Math.random() * 3) * 4, vz = Math.min(20, 8 + S.level * 1.2);
-    if (canMoveTrain(L, z, vz)) {
-      const o = objs.spawn("capsule", L, z - len / 2, 0, { len, ramp: false, color: Math.floor(Math.random() * 4), vz });
-      S.occ[L] = len + 6; S.gen.caps++; S.gen.moving++;
-      for (let d = len / 2 - 1.5; d > -len / 2 + 1; d -= 1.6) objs.spawn("drop", L, o.z + d, CAPSULE.top + 0.6, { vz, ride: o });
+const PAT = {
+  coins(d) { const l = pick([0, 1, 2]); coins(l, d + 2, 7); return 20; },
+  low1(d) { const l = pick([0, 1, 2]); add({ t: "low", lane: l, d: d + 8 }); arc(l, d + 8 - G.speed * 0.3, G.speed * 0.6, 1.1, 5); coins(pick(others(l)), d + 2, 5); return 18; },
+  lowRow(d) { for (const l of [0, 1, 2]) add({ t: "low", lane: l, d: d + 8 }); const l = pick([0, 1, 2]); arc(l, d + 8 - G.speed * 0.3, G.speed * 0.6, 1.1, 5); return 18; },
+  archRow(d) { for (const l of [0, 1, 2]) add({ t: "arch", lane: l, d: d + 8 }); coins(pick([0, 1, 2]), d + 3, 5, { y: 0.45 }); return 18; },
+  mixRow(d) { const ty = shuffle(["low", "arch", "block"]); ty.forEach((t, l) => add({ t, lane: l, d: d + 8 })); const l = ty.indexOf("low"); arc(l, d + 8 - G.speed * 0.3, G.speed * 0.6, 1.1, 4); return 18; },
+  two(d) { const open = pick([0, 1, 2]); for (const l of others(open)) add({ t: "block", lane: l, d: d + 9 }); coins(open, d + 2, 7); return 20; },
+  zig(d) { const a = pick([0, 1, 2]), b = pick(others(a)), gap = react() + 3; for (const l of others(a)) add({ t: "block", lane: l, d: d + 8 }); for (const l of others(b)) add({ t: "block", lane: l, d: d + 8 + gap }); coins(a, d + 2, 4); coins(b, d + 8 + gap * 0.45, 4); return 16 + gap + 4; },
+  slalom(d) { const order = shuffle([0, 1, 2]), gap = react(); order.forEach((l, i) => add({ t: i % 2 ? "low" : "block", lane: l, d: d + 8 + i * gap * 0.75 })); coins(order[2], d + 3, 5); return 14 + gap * 1.5 + 6; },
+  mover(d) { const l = pick([0, 1, 2]), o = others(l); add({ t: "mover", lane: l, d: d + 70, v: 9 + Math.random() * 4 }); coins(o[0], d + 4, 8); add({ t: "low", lane: o[1], d: d + 26 }); return 46; },
+  tramp(d) { // trambolin → fibrin köprüsü (üstte nadir vitaminler); zeminde diğer iki şeritte alçak engel
+    const l = pick([0, 1, 2]), len = Math.max(30, G.speed * 2.6), ps = d + 8 + 6;
+    add({ t: "tramp", lane: l, d: d + 8 }); arc(l, d + 9, 5, 0.9, 3, { base: 2.2 });
+    add({ t: "plat", lane: l, d: ps, len }); coins(l, ps + 3, Math.floor((len - 6) / 2.6), { y: PLAT_H + 0.95, step: 2.6, rare: true });
+    for (const o of others(l)) add({ t: "low", lane: o, d: ps + len * 0.5 }); coins(pick(others(l)), d + 6, 4);
+    return 14 + len + 12;
+  },
+  ramp(d) { const l = pick([0, 1, 2]), len = Math.max(28, G.speed * 2.4), rs = d + 6, ps = rs + 7;
+    add({ t: "ramp", lane: l, d: rs, len: 7 }); add({ t: "plat", lane: l, d: ps, len });
+    coins(l, ps + 2, Math.floor((len - 5) / 2.6), { y: PLAT_H + 0.95, step: 2.6, rare: true });
+    const o = others(l); add({ t: "arch", lane: o[0], d: ps + len * 0.4 }); add({ t: "low", lane: o[1], d: ps + len * 0.4 });
+    return 13 + len + 12;
+  },
+  bridges(d) { // trambolin → köprü A → boşluk → köprü B (platformdan platforma atlama)
+    const a = pick([0, 1, 2]), b = pick([a, ...others(a).filter(x => Math.abs(x - a) === 1)]), lenA = Math.max(24, G.speed * 2), lenB = Math.max(24, G.speed * 2), gap = clamp(G.speed * 0.3, 4, 7), ps = d + 14;
+    add({ t: "tramp", lane: a, d: d + 8 }); add({ t: "plat", lane: a, d: ps, len: lenA }); coins(a, ps + 3, Math.floor((lenA - 7) / 2.6), { y: PLAT_H + 0.95, step: 2.6, rare: true });
+    const pb = ps + lenA + gap; add({ t: "plat", lane: b, d: pb, len: lenB }); arc(b, ps + lenA - 1, gap + 2, 0.7, 3, { base: PLAT_H + 1.2, rare: true }); coins(b, pb + 4, Math.floor((lenB - 7) / 2.6), { y: PLAT_H + 0.95, step: 2.6, rare: true });
+    const free = [0, 1, 2].filter(x => x !== a && x !== b); if (free.length) add({ t: "block", lane: free[0], d: ps + lenA * 0.6 });
+    return 14 + lenA + gap + lenB + 12;
+  },
+  power(d) { const l = pick([0, 1, 2]), k = pick(Object.keys(POWERS)); add({ t: "pow", lane: l, x: LANES[l], y: 1.05, d: d + 10, kind: k }); coins(l, d + 2, 3); return 20; }
+};
+const WEIGHTS = [
+  { coins: 2, low1: 4, lowRow: 2, archRow: 2, two: 3, mixRow: 1, tramp: 1.4, ramp: 1, zig: 0.8 },
+  { coins: 1, low1: 2, lowRow: 1.5, archRow: 1.5, two: 2, mixRow: 2, tramp: 3.2, ramp: 2.6, bridges: 2.6, zig: 1, slalom: 1 },
+  { coins: 0.6, low1: 1.5, lowRow: 2, archRow: 2, two: 2, mixRow: 2.5, zig: 2.6, slalom: 2.4, mover: 3, tramp: 1.2, bridges: 1.2, ramp: 0.8 }
+];
+function generate() {
+  while (G.genD < G.dist + 135) {
+    let name;
+    if (G.genD < 26) name = "coins";
+    else if (G.genD - G.lastPow > 230 && Math.random() < 0.6) { name = "power"; G.lastPow = G.genD; }
+    else {
+      const w = WEIGHTS[Math.min(2, Math.floor(G.genD / ZONE_LEN))], keys = Object.keys(w).filter(k => k !== G.lastPat);
+      let r = Math.random() * keys.reduce((s, k) => s + w[k], 0); name = keys[keys.length - 1];
+      for (const k of keys) { r -= w[k]; if (r <= 0) { name = k; break; } }
     }
-    S.plan = null;
+    G.lastPat = name;
+    const zoneK = G.genD >= ZONE_LEN * 2 ? 0.9 : 1;
+    G.genD += PAT[name](G.genD) + Math.max(8, G.speed * 0.55) * zoneK;
   }
-  const lane = (pat.free.length ? pat.free : pat.pass)[Math.floor(Math.random() * (pat.free.length || pat.pass.length))];
-  if (S.jetT > 0) for (let i = 0; i < 6; i++) objs.spawn("drop", Math.random() < 0.3 ? 1 : lane, z + 2 + i * 2.4, 5.4);
-  else if (!pat.capsules.length && Math.random() < 0.75) for (let i = 0; i < 5; i++) objs.spawn("drop", lane, z + 3 + i * 2, 0.55);
-  pat.lanes.forEach((type, l) => { if (type === "plaque" && Math.random() < 0.5 && S.jetT <= 0) for (let i = -2; i <= 2; i++) objs.spawn("drop", l, z + i * 1.15, 0.6 + 1.55 * (1 - (i / 2.6) ** 2)); });
-  if (warmup) return;
-  const place = (type, extra, roofBias = 0.6) => {
-    if (roofs.length && Math.random() < roofBias) { const r = roofs[Math.floor(Math.random() * roofs.length)]; return objs.spawn(type, r.lane, r.z + (Math.random() - 0.5) * r.len * 0.4, CAPSULE.top + 1.1, extra); }
-    const pl = pat.lanes.findIndex(t => t === "plaque");
-    if (type === "letter" && pl >= 0) return objs.spawn(type, pl, z, 2.25, extra); // zıplama noktası
-    return objs.spawn(type, lane, z + 8, 1.1, extra);
+}
+
+/* ================= Efektler ================= */
+function burst(x, y, z, c, n = 14, pw = 7) { for (let i = 0; i < n && G.parts.length < 170; i++) G.parts.push({ x, y, z, vx: rnd(-pw, pw), vy: rnd(-1, pw), vz: rnd(-pw * 0.5, pw * 0.5), life: rnd(0.35, 0.7), max: 0.7, r: rnd(0.07, 0.18), c }); }
+function pop(txt, c = "#fff", y = 2.2) { G.pops.push({ x: G.player.x, y: G.player.y + y, z: 0.2, txt, c, life: 1 }); if (G.pops.length > 8) G.pops.shift(); }
+function flash(c, a = 1) { G.flashC = c; G.flash = a; }
+let toastTimer = 0;
+function toast(txt, color = "#fff") { const el = $("dkToast"); el.hidden = true; void el.offsetWidth; el.textContent = txt; el.style.color = color; el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 1650); }
+function strip(txt, done) { const el = $("dkMission"); el.hidden = true; void el.offsetWidth; el.textContent = txt; el.classList.toggle("is-done", !!done); el.hidden = false; setTimeout(() => { if (el.textContent === txt) el.hidden = true; }, 3050); }
+
+/* ================= Oyun akışı ================= */
+const mult = () => (G.baseMult + Math.min(5, Math.floor(G.dist / ZONE_LEN)) + (G.mDone ? 1 : 0)) * (G.powers.x2 > 0 ? 2 : 1) * (G.frenzyT > 0 ? 3 : 1);
+function missionAdd(id, n = 1) {
+  if (!G.mission || G.mDone || G.mission.id !== id) return;
+  G.mProg += n;
+  if (G.mProg >= G.mission.n) { G.mDone = true; G.vp += MISSION_BONUS; Ses.mission(); strip(`Görev tamam! +${MISSION_BONUS} Vita-Puan · çarpan +1`, true); }
+}
+function start() {
+  Ses.unlock();
+  Object.assign(G, { mode: "run", dist: 0, speed: SPEED0, ents: [], parts: [], pops: [], trail: [], player: newPlayer(), threat: 0, chaseT: CHASE_T, stumbled: false,
+    shieldT: 0, frenzyT: 0, powers: { magnet: 0, spring: 0, x2: 0 }, streak: 0, lastGot: -9, flash: 0, shake: 0, score: 0, vp: 0, vits: {}, genD: 0, lastPow: 60, lastPat: "",
+    mProg: 0, mDone: false, zone: 0, char: profile.char, cap: profile.cap, deadT: 0, heartT: 0, seenBridge: false });
+  G.baseMult = 1 + (G.char === "b12" ? 1 : 0);
+  if (G.char === "demir") G.powers.magnet = 3;
+  G.mission = pick(MISSIONS);
+  generate();
+  for (const id of ["dkMenu", "dkOver", "dkPause", "dkShop", "dkHelp"]) $(id).hidden = true;
+  $("dkHud").hidden = false; $("dkToast").hidden = true;
+  strip(G.mission.text(G.mission.n)); hud(true);
+}
+function die(reason) {
+  if (G.mode !== "run") return;
+  G.mode = "dying"; G.deadT = 0.85; G.deathReason = reason; G.shake = 1; flash("rgba(255,80,80,A)", 1);
+  Ses.over(); burst(G.player.x, G.player.y + 0.9, 0, "#fecaca", 26, 9);
+  if (navigator.vibrate) try { navigator.vibrate(120); } catch (_) {}
+}
+function finish() {
+  G.mode = "over";
+  const score = Math.floor(G.score), record = score > profile.best;
+  profile.vp += G.vp; profile.runs++; if (record) profile.best = score; saveProfile(profile);
+  $("dkHud").hidden = true;
+  $("dkOverTitle").textContent = G.deathReason === "caught" ? "Toksin Dalgası Yakaladı!" : "Damar Tıkandı!";
+  $("dkRecord").hidden = !record;
+  $("dkOverScore").textContent = score.toLocaleString("tr-TR"); $("dkOverBest").textContent = profile.best.toLocaleString("tr-TR"); $("dkOverVp").textContent = "+" + G.vp;
+  const top = Object.keys(G.vits).sort((a, b) => G.vits[b] - G.vits[a])[0] || pick(VIT_KEYS);
+  $("dkFact").textContent = (G.vits[top] ? `Bu tur en çok ${VITAMINS[top].name} topladın. ` : "") + pick(VITAMINS[top].facts);
+  $("dkOver").hidden = false; setTimeout(() => $("dkAgain").focus(), 60);
+}
+function toMenu() {
+  G.mode = "menu"; G.ents = []; G.parts = []; G.pops = []; G.threat = 0; G.chaseT = 0; G.shieldT = 0; G.frenzyT = 0; G.powers = { magnet: 0, spring: 0, x2: 0 }; G.player = newPlayer(); G.speed = 7;
+  G.char = profile.char; G.cap = profile.cap;
+  for (const id of ["dkOver", "dkPause", "dkHud", "dkShop", "dkHelp"]) $(id).hidden = true;
+  $("dkMenu").hidden = false; menuInfo();
+}
+function menuInfo() { $("dkBank").textContent = profile.vp.toLocaleString("tr-TR"); $("dkBestLine").textContent = profile.best ? `En yüksek skor: ${profile.best.toLocaleString("tr-TR")}` : ""; }
+function pause(on) {
+  if (on && G.mode === "run") { G.mode = "pause"; $("dkPause").hidden = false; $("dkResume").focus(); }
+  else if (!on && G.mode === "pause") { G.mode = "run"; $("dkPause").hidden = true; last = performance.now(); }
+}
+
+/* ================= Oyuncu komutları ================= */
+function moveLane(dir) {
+  if (G.mode !== "run") return; const pl = G.player, n = clamp(pl.lane + dir, 0, 2);
+  if (n === pl.lane) return; pl.prevLane = pl.lane; pl.lane = n; pl.laneT = 0; Ses.lane();
+}
+function doJump() {
+  const pl = G.player; pl.ground = false; pl.slideT = 0; pl.bufJump = 0;
+  const sup = G.powers.spring > 0; pl.vy = (sup ? SUPER_V : JUMP_V) * (G.char === "d3" ? Math.sqrt(1.15) : 1);
+  pl.sqx = 0.85; pl.sqy = 1.2; sup ? Ses.superJump() : Ses.jump();
+}
+function doSlide() { const pl = G.player; pl.slideT = SLIDE_T; pl.bufSlide = 0; Ses.slide(); }
+function jump() { if (G.mode !== "run") return; const pl = G.player; if (pl.ground) doJump(); else pl.bufJump = BUFFER_T; }
+function down() {
+  if (G.mode !== "run") return; const pl = G.player;
+  if (pl.ground) doSlide(); else { pl.vy = Math.min(pl.vy, -26); pl.bufSlide = 0.4; }   // havada: yere çakıl, inince kay
+}
+function useCapsule() {
+  if (G.mode !== "run" || G.shieldT > 0 || profile.stock <= 0) { if (G.mode === "run" && G.shieldT <= 0) Ses.deny(); return; }
+  profile.stock--; saveProfile(profile); G.shieldT = SHIELD_T; Ses.shield(); flash("rgba(94,234,212,A)", 0.6); toast("Biyo-Sörf Kapsülü", CAPS[G.cap].c1); hud(true);
+}
+
+/* ================= Çarpışma ================= */
+function smash(e, z) { e.smashed = true; const c = e.t === "low" ? "#fbbf24" : e.t === "arch" ? "#d8b4fe" : e.t === "mover" ? "#fde047" : "#fca5a5"; burst(LANES[e.lane], 1, z, c, 22, 9); Ses.smash(); G.shake = 0.6; G.score += 50 * mult(); pop("+" + 50 * mult(), "#fde047"); }
+function stumble(e) {
+  const pl = G.player; e.hit = true;
+  if (G.chaseT > 0 && G.stumbled) return die("caught");
+  G.stumbled = true; G.chaseT = CHASE_T; pl.stumbleT = 1; pl.invT = 0.9; G.shake = 0.5; G.streak = 0; Ses.stumble(); flash("rgba(255,120,120,A)", 0.5); toast("Tökezledin!", "#fca5a5");
+  if (navigator.vibrate) try { navigator.vibrate(60); } catch (_) {}
+}
+function hitObstacle(e, z, side) {
+  const pl = G.player;
+  if (G.frenzyT > 0) return smash(e, z);
+  if (G.shieldT > 0) { smash(e, z); G.shieldT = 0; pl.invT = 1; flash("rgba(94,234,212,A)", 0.8); toast("Kapsül kırıldı!", "#99f6e4"); hud(true); return; }
+  if (pl.invT > 0) { e.hit = true; return; }
+  if (side) { pl.lane = pl.prevLane; pl.laneT = 9; return stumble(e); }
+  e.hit = true; die("crash");
+}
+function collide(dt) {
+  const pl = G.player, moving = pl.laneT < 0.24;   // şerit değişimi sürüyor: bu sırada girilen şeritteki engel "yandan sürtme"dir
+  for (const e of G.ents) {
+    if (e.hit || e.got || e.smashed) continue;
+    const z = e.d - G.dist, t = e.t;
+    if (t === "vit" || t === "pow") {
+      if (t === "vit" && G.powers.magnet > 0 && z < 17 && z > -1) { e.pull = Math.min(1, (e.pull || 0) + dt * 3.5); const k = e.pull * e.pull; e.x = lerp(e.x, pl.x, k * 0.35); e.y = lerp(e.y, pl.y + 0.95, k * 0.35); e.d -= dt * e.pull * 16; }
+      if (Math.abs(z) < 1.0 && Math.abs(e.x - pl.x) < 1.0 && Math.abs(e.y - (pl.y + (pl.slideT > 0 ? 0.45 : 0.95))) < 1.15) {
+        e.got = true;
+        if (t === "pow") { G.powers[e.kind] = POWER_T; Ses.power(); toast(POWERS[e.kind].name, POWERS[e.kind].color); flash("rgba(255,255,255,A)", 0.4); burst(e.x, e.y, 0, POWERS[e.kind].color, 16); hud(true); continue; }
+        const val = e.rare ? 3 : 1; G.vp += val; G.vits[e.kind] = (G.vits[e.kind] || 0) + 1; G.streak++; G.lastGot = G.t;
+        G.score += 10 * val * mult(); Ses.collect(G.streak); burst(e.x, e.y, 0.2, VITAMINS[e.kind].c1, 5, 4); missionAdd("vit");
+        if (G.streak >= FRENZY_N && G.frenzyT <= 0) { G.frenzyT = FRENZY_T; G.streak = 0; Ses.frenzy(); toast("Biyo-Frenzy! x3", "#fde047"); flash("rgba(253,224,71,A)", 0.9); hud(true); }
+      } else if (z < -1.3 && !e.missed) { e.missed = true; if (t === "vit" && G.t - G.lastGot > 0.75) G.streak = 0; }
+      continue;
+    }
+    if (t === "plat" || t === "ramp") continue;
+    if (t === "mover") e.d -= e.v * dt;
+    const dx = Math.abs(LANES[e.lane] - pl.x), reach = (G.speed + (e.v || 0)) * dt + 0.75;
+    if (t === "tramp") { if (pl.ground && pl.surf < 0.05 && dx < 0.95 && z < 0.9 && z > -0.9) { e.hit = true; pl.ground = false; pl.slideT = 0; pl.vy = TRAMP_V; pl.sqx = 0.8; pl.sqy = 1.3; Ses.tramp(); burst(pl.x, 0.2, 0, "#bef264", 12, 5); missionAdd("tramp"); } continue; }
+    if (z > reach || z < -0.75) { if (z < -0.75 && !e.passed) { e.passed = true; if (!e.hit && e.lane === pl.lane) { if (t === "low" && !pl.ground) missionAdd("jump"); if (t === "arch" && pl.slideT > 0) missionAdd("slide"); } } continue; }
+    const leaving = moving && e.lane === pl.prevLane && e.lane !== pl.lane;
+    if (dx > (leaving ? 0.7 : 1.25)) continue;
+    const side = moving && e.lane === pl.lane;
+    if (t === "low") { if (pl.y > 0.88) continue; if (pl.y > 0.42 && !side) { if (G.frenzyT > 0 || G.shieldT > 0) hitObstacle(e, z, false); else if (pl.invT <= 0) stumble(e); else e.hit = true; continue; } }
+    else if (t === "arch") { if (pl.slideT > 0 && pl.y < 0.3) continue; if (pl.y > 2.3) continue; }
+    else if (pl.y > 2.05) continue;                    // duvar / serbest radikal: üstünden (köprüden) geçilebilir
+    hitObstacle(e, z, side);
+    if (G.mode !== "run") return;
+  }
+}
+
+/* Oyuncunun bastığı yüzey: zemin (0), rampa ya da köprü */
+function surfaceAt(pl) {
+  let h = 0;
+  for (const e of G.ents) {
+    if (e.t !== "plat" && e.t !== "ramp") continue;
+    const z = e.d - G.dist; if (z > 0.35 || z + e.len < -0.35) continue;
+    if (Math.abs(LANES[e.lane] - pl.x) > 1.05) continue;
+    const sh = e.t === "plat" ? PLAT_H : clamp(-z / e.len) * PLAT_H;
+    if (pl.y >= sh - (e.t === "ramp" ? 0.75 : 0.3)) h = Math.max(h, sh);
+    else if (e.t === "plat" && pl.vy > 0 && pl.y + PLAYER_H * 0.8 > PLAT_H - 0.3) pl.vy = 0;   // alttan kafa çarpması
+  }
+  return h;
+}
+
+/* ================= Güncelleme ================= */
+function update(dt) {
+  const pl = G.player; G.t += dt; G.dt = dt;
+  G.flash = Math.max(0, G.flash - dt * 2.4); G.shake = Math.max(0, G.shake - dt * 2.2);
+  for (const q of G.parts) { q.life -= dt; q.x += q.vx * dt; q.y += q.vy * dt; q.z += (q.vz - G.speed * 0.5) * dt; q.vy -= 14 * dt; }
+  G.parts = G.parts.filter(q => q.life > 0);
+  for (const q of G.pops) q.life -= dt * 1.3; G.pops = G.pops.filter(q => q.life > 0);
+
+  if (G.mode === "menu") { G.dist += G.speed * dt; pl.phase += dt * 9; pl.x = lerp(pl.x, Math.sin(G.t * 0.5) * 1.6, dt * 2); G.trail.push({ x: pl.x, y: 0, t: G.t }); if (G.trail.length > 24) G.trail.shift(); return; }
+  if (G.mode === "dying") { G.speed = lerp(G.speed, 0, dt * 6); G.dist += G.speed * dt; G.threat = clamp(G.threat + dt * (G.deathReason === "caught" ? 4 : 0)); G.deadT -= dt; if (G.deadT <= 0) finish(); return; }
+  if (G.mode !== "run") return;
+
+  G.speed = Math.min(SPEED_MAX, SPEED0 + G.dist * SPEED_PER_M + (G.dist > ZONE_LEN * 2 ? 1.5 : 0)) * (pl.stumbleT > 0 ? 0.82 : 1);
+  const step = G.speed * dt; G.dist += step; G.score += step * mult(); missionAdd("dist", step);
+  const zi = Math.floor(G.dist / ZONE_LEN);
+  if (zi !== G.zone) { G.zone = zi; if (zi <= 2) { toast(R.zoneName(G.dist), "#fff"); Ses.zone(); flash("rgba(255,255,255,A)", 0.5); } pop("Çarpan +1", "#5eead4"); hud(true); }
+
+  // yatay: yumuşak şerit geçişi + yana yatma
+  const tx = LANES[pl.lane], dxl = tx - pl.x; pl.x += dxl * clamp(dt * 15); if (Math.abs(dxl) < 0.02) pl.x = tx;
+  pl.tilt = lerp(pl.tilt, clamp(dxl * 0.32, -0.42, 0.42), clamp(dt * 16));
+  // dikey
+  const surf = surfaceAt(pl); pl.surf = surf;
+  if (pl.ground) {
+    if (surf < pl.y - 0.4) { pl.ground = false; pl.vy = 0; }                         // köprü bitti: düş
+    else { pl.y = surf; if (surf >= PLAT_H - 0.01 && !G.seenBridge) { G.seenBridge = true; missionAdd("bridge"); } }
+  }
+  if (!pl.ground) {
+    pl.vy -= GRAV * dt; pl.y += pl.vy * dt;
+    if (pl.bufJump > 0) pl.bufJump -= dt; if (pl.bufSlide > 0) pl.bufSlide -= dt;
+    if (pl.y <= surf && pl.vy <= 0) {
+      pl.y = surf; pl.ground = true; pl.land = 0.16; Ses.land(); burst(pl.x, surf + 0.05, 0, "rgba(255,255,255,.7)", 5, 3);
+      if (surf >= PLAT_H - 0.01 && !G.seenBridge) { G.seenBridge = true; missionAdd("bridge"); }
+      if (pl.bufJump > 0) doJump(); else if (pl.bufSlide > 0) doSlide();
+    }
+  }
+  if (pl.slideT > 0) { pl.slideT -= dt; if (Math.random() < 0.6) G.parts.push({ x: pl.x + rnd(-0.4, 0.4), y: pl.y + 0.05, z: -0.2, vx: rnd(-2, 2), vy: rnd(1, 3), vz: 0, life: 0.3, max: 0.3, r: 0.07, c: "#5eead4" }); }
+  // esne-uza
+  if (pl.land > 0) { pl.land -= dt; const k = pl.land / 0.16; pl.sqx = 1 + 0.22 * k; pl.sqy = 1 - 0.24 * k; }
+  else if (!pl.ground) { const k = clamp(Math.abs(pl.vy) / 22); pl.sqx = lerp(pl.sqx, 1 - 0.1 * k, dt * 12); pl.sqy = lerp(pl.sqy, 1 + 0.16 * k, dt * 12); }
+  else { pl.sqx = lerp(pl.sqx, 1, dt * 14); pl.sqy = lerp(pl.sqy, 1, dt * 14); }
+  pl.phase += dt * (6 + G.speed * 0.42);
+  if (pl.stumbleT > 0) pl.stumbleT -= dt; if (pl.invT > 0) pl.invT -= dt; pl.laneT += dt;
+  G.trail.push({ x: pl.x, y: pl.y, t: G.t }); if (G.trail.length > 26) G.trail.shift();
+
+  // zamanlayıcılar
+  for (const k in G.powers) if (G.powers[k] > 0) { G.powers[k] -= dt; if (G.powers[k] <= 0) hud(true); }
+  if (G.shieldT > 0) { G.shieldT -= dt; if (G.shieldT <= 0) hud(true); }
+  if (G.frenzyT > 0) { G.frenzyT -= dt; if (Math.random() < 0.7) G.parts.push({ x: pl.x + rnd(-0.5, 0.5), y: pl.y + rnd(0.2, 1.7), z: -0.1, vx: rnd(-1, 1), vy: rnd(1, 4), vz: 0, life: 0.45, max: 0.45, r: 0.09, c: "#fde047" }); if (G.frenzyT <= 0) hud(true); }
+  if (G.chaseT > 0) {
+    G.chaseT -= dt; G.threat = clamp(G.threat + dt * 3);
+    G.heartT -= dt; if (G.heartT <= 0) { const near = G.stumbled ? 1 : 0.4; Ses.heart(near); G.heartT = lerp(0.85, 0.36, near * clamp(1 - G.chaseT / CHASE_T + 0.4)); }
+    if (G.chaseT <= 0) G.stumbled = false;
+  } else G.threat = Math.max(0, G.threat - dt * 1.4);
+
+  collide(dt);
+  if (G.mode !== "run") return;
+  G.ents = G.ents.filter(e => !e.got && !e.smashed && (e.d + (e.len || 0)) - G.dist > -9);
+  generate(); hud(false);
+}
+
+/* ================= HUD ================= */
+const RINGS = [["shield", "S", () => G.shieldT / SHIELD_T, () => CAPS[G.cap].c1], ["frenzy", "★", () => G.frenzyT / FRENZY_T, () => "#fde047"],
+  ["magnet", "U", () => G.powers.magnet / POWER_T, () => POWERS.magnet.color], ["spring", "⇡", () => G.powers.spring / POWER_T, () => POWERS.spring.color], ["x2", "2x", () => G.powers.x2 / POWER_T, () => POWERS.x2.color]];
+const ringEls = {};
+(function buildRings() {
+  const host = $("dkRings");
+  for (const [id, label] of RINGS) {
+    const d = document.createElement("div"); d.className = "dk-ring"; d.hidden = true;
+    d.innerHTML = `<svg viewBox="0 0 46 46"><circle cx="23" cy="23" r="20"/><circle cx="23" cy="23" r="20" stroke-dasharray="125.66" stroke-dashoffset="0"/></svg><span>${label}</span>`;
+    host.appendChild(d); ringEls[id] = { el: d, arc: d.querySelectorAll("circle")[1] };
+  }
+})();
+let hudScore = -1, hudVp = -1, hudMult = -1;
+function hud(force) {
+  const s = Math.floor(G.score), m = mult();
+  if (s !== hudScore) { hudScore = s; $("dkScore").textContent = s.toLocaleString("tr-TR"); }
+  if (G.vp !== hudVp) { hudVp = G.vp; $("dkVp").textContent = G.vp; }
+  if (m !== hudMult || force) { hudMult = m; const el = $("dkMult"); el.textContent = "x" + m; el.classList.toggle("is-hot", G.frenzyT > 0 || G.powers.x2 > 0); }
+  for (const [id, , frac, color] of RINGS) {
+    const f = frac(), r = ringEls[id];
+    if (f > 0) { if (r.el.hidden) { r.el.hidden = false; r.el.style.setProperty("--c", color()); } r.arc.setAttribute("stroke-dashoffset", (125.66 * (1 - clamp(f))).toFixed(1)); }
+    else if (!r.el.hidden) r.el.hidden = true;
+  }
+  if (force) {
+    const b = $("dkCapBtn"); $("dkCapN").textContent = profile.stock; b.disabled = profile.stock <= 0 && G.shieldT <= 0; b.classList.toggle("is-on", G.shieldT > 0); b.style.setProperty("--capc", CAPS[profile.cap].c1);
+  }
+}
+const SND_ON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+const SND_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+function soundUi() { const b = $("dkSound"); b.innerHTML = profile.sound ? SND_ON : SND_OFF; b.setAttribute("aria-pressed", String(profile.sound)); b.setAttribute("aria-label", profile.sound ? "Sesi kapat" : "Sesi aç"); }
+
+/* ================= Biyo-Mağaza ================= */
+let shopTab = "chars";
+const coin = '<i class="dk-coin" aria-hidden="true"></i>';
+function renderShop() {
+  $("dkShopBank").textContent = profile.vp.toLocaleString("tr-TR");
+  document.querySelectorAll("#dkShop [data-tab]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === shopTab)));
+  const body = $("dkShopBody"); body.innerHTML = "";
+  const item = (kind, key, def, owned, selected, preview, desc) => {
+    const d = document.createElement("div"); d.className = "dk-item" + (selected ? " is-sel" : "");
+    const st = selected ? "sel" : owned ? "own" : "buy";
+    d.innerHTML = `${preview}<b>${def.name}</b><small>${desc}</small><button type="button" data-kind="${kind}" data-key="${key}" data-state="${st}" ${st === "sel" || (st === "buy" && profile.vp < def.price) ? "disabled" : ""}>${st === "sel" ? "Seçili" : st === "own" ? "Seç" : coin + def.price}</button>`;
+    body.appendChild(d); return d;
   };
-  // Turkuaz Enerji Kapsülü (kaykay şarjı)
-  if (S.dist >= S.nextChargeAt) { place("charge", {}, 0.35); S.nextChargeAt = S.dist + 28 + Math.random() * 30; }
-  // Güçlendirici (Jet, Bot, Mıknatıs, 2x)
-  if (S.dist >= S.nextPowerAt) {
-    const opts = ["magnet", "jet", "boots", "x2"].filter(k => !(k === "magnet" && S.magnetT > 0) && !(k === "jet" && S.jetT > 0) && !(k === "boots" && S.bootsT > 0) && !(k === "x2" && S.x2T > 0));
-    if (opts.length) place(opts[Math.floor(Math.random() * opts.length)]);
-    S.nextPowerAt = S.dist + 200 + Math.random() * 180;
+  if (shopTab === "chars") for (const k in CHARS) { const d = item("char", k, CHARS[k], profile.chars.includes(k), profile.char === k, "<canvas></canvas>", CHARS[k].perk); drawCharIcon(d.querySelector("canvas"), k); }
+  else if (shopTab === "caps") for (const k in CAPS) item("cap", k, CAPS[k], profile.caps.includes(k), profile.cap === k, `<span class="dk-sw"><i style="--a:${CAPS[k].c1};--b:${CAPS[k].c2}"></i></span>`, "Biyo-Sörf Kapsülü tasarımı");
+  else {
+    const d = document.createElement("div"); d.className = "dk-stock"; const full = profile.stock >= STOCK_MAX;
+    d.innerHTML = `<p><b>Kapsül stoğu: ${profile.stock} / ${STOCK_MAX}</b>Tek kullanımlık Biyo-Sörf Kapsülü: 10 sn korur, ilk çarpmada engeli parçalar.</p><button type="button" data-kind="stock" ${full || profile.vp < STOCK_PRICE ? "disabled" : ""}>${full ? "Dolu" : coin + STOCK_PRICE}</button>`;
+    body.appendChild(d);
   }
-  // Günlük kelimenin sıradaki harfi
-  if (!profile.word.done && !S.letterOut && S.dist >= S.nextLetterAt) {
-    place("letter", { ch: [...profile.word.word][profile.word.got] }); S.letterOut = true;
-    S.nextLetterAt = S.dist + 150 + Math.random() * 120;
+}
+$("dkShopBody").addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-kind]"); if (!b || b.disabled) return;
+  const { kind, key, state } = b.dataset;
+  if (kind === "stock") { if (profile.vp < STOCK_PRICE || profile.stock >= STOCK_MAX) return Ses.deny(); profile.vp -= STOCK_PRICE; profile.stock++; Ses.buy(); }
+  else {
+    const defs = kind === "char" ? CHARS : CAPS, list = kind === "char" ? profile.chars : profile.caps;
+    if (state === "buy") { if (profile.vp < defs[key].price) return Ses.deny(); profile.vp -= defs[key].price; list.push(key); Ses.buy(); } else Ses.click();
+    if (kind === "char") { profile.char = key; G.char = key; } else { profile.cap = key; G.cap = key; }
   }
-  // Gizemli Biyo-Kapsül (nadir)
-  if (S.dist >= S.nextBoxAt) { place("box"); S.nextBoxAt = S.dist + 700 + Math.random() * 500; }
-}
-
-/* ---------------- Girdi ---------------- */
-function laneBlocked(nl) {
-  const top = CAPSULE.top - 0.45;
-  if (S.y < top && objs.capsuleBeside(nl)) return true;
-  const ph = S.slideK > 0.5 ? 0.7 : 1.75;
-  return objs.list.some(o => o.alive && OB[o.type] && o.lane === nl && !o.moving && Math.abs(o.z) < OB[o.type].hz + 0.45 && S.y < OB[o.type].y1 && S.y + ph > OB[o.type].y0);
-}
-/* Yan sürtme: ilk hata = sersemleme yıldızları + Toksin enseden takip (6 sn). Yıldızlar sönmeden ikinci hata = yakalanma. */
-function graze() {
-  S.stumble = 0.45; S.shake = Math.max(S.shake, 0.22); sfx.graze();
-  objs.burst(S.x, S.y + 1, 0, 0xfbbf24, 10, 0.6);
-  if (S.boardT > 0) { breakBoard(null); return; }
-  if (S.chaseT > 0) { crash("chaser"); return; }
-  S.chaseT = STUN_T; sfx.chaser(); toast("Sersemledin! Toksin ensende — 6 sn hatasız koş", "level");
-}
-function move(dir) {
-  if (S.mode !== "run") return;
-  const nl = Math.max(0, Math.min(2, S.lane + dir));
-  if (nl === S.lane) return;
-  if (S.jetT <= 0 && S.invulnT <= 0 && laneBlocked(nl)) { graze(); return; }  // trenin / engelin yan yüzüne sürtme
-  S.lane = nl; sfx.lane();
-}
-function jump() {
-  if (S.mode !== "run" || S.jetT > 0 || S.airborne) return;
-  const sup = S.bootsT > 0 || (S.boardT > 0 && profile.sel.board === "magnezyum");
-  const v = JUMP_V * (sup ? SUPER : 1);
-  S.airborne = true; S.vy = v; S.airT = 0; S.airDur = 2 * v / G; S.noFlip = false; S.slideT = 0; sfx.jump();
-  S.runStats.jumps++; mission("jump", 1);
-}
-/* Aşağı: yerdeyse kayma; havadaysa (zıplama ya da çatıdan düşüş) hızlı iniş + şok dalgası, ardından kayma */
-function slide() {
-  if (S.mode !== "run" || S.jetT > 0) return;
-  if (S.airborne) { S.vy = Math.min(S.vy, -38); S.slam = true; S.queuedSlide = true; sfx.slide(); return; }
-  S.slideT = 0.78; sfx.slide();
-}
-function useBoard() {
-  if (S.mode !== "run" || S.boardT > 0) return false;
-  let src;
-  if (S.charge >= CHARGE_MAX) { S.charge = 0; src = "charge"; }
-  else if (profile.boards > 0) { profile.boards -= 1; saveProfile(profile); src = "stock"; }
-  else { toast(`Kaykay şarjı %${Math.round(S.charge / CHARGE_MAX * 100)} — turkuaz enerji kapsülü topla`, "level"); return false; }
-  S.boardT = BOARD_T;
-  sfx.board(); toast(`Plazma Kaykay aktif! ${BOARD_T} sn${profile.sel.board === "magnezyum" ? " · süper zıplama" : ""}`, "turbo");
-  objs.burst(S.x, S.y + 0.2, 0, 0x5eead4, 24, 0.8);
-  S.runStats.board++; mission("board", 1); renderHud(true);
-  return src;
-}
-function removeCapsule(o) { objs.list.forEach(q => { if (q.ride === o) objs.remove(q); }); objs.remove(o); }
-/* Kaykay: engeli büyük parçacık/duman patlamasıyla parçalar ve tükenir; koşu sürer */
-function breakBoard(target) {
-  const zx = target ? target.x : S.x;
-  S.boardT = 0; S.invulnT = 1.0; sfx.boardBreak(); sfx.smash(); S.shake = 0.4;
-  objs.burst(zx, 1.0, -0.6, 0x94a3b8, 70, 1.5);   // duman
-  objs.burst(zx, 1.2, -0.6, 0xe2e8f0, 40, 1.1);
-  objs.burst(S.x, S.y + 0.3, 0, profile.sel.board === "magnezyum" ? 0xc084fc : 0x5eead4, 50, 1.6);
-  if (target) target.type === "capsule" ? removeCapsule(target) : objs.remove(target);
-  toast("Kaykay parçalandı — koşu devam ediyor!", "turbo");
-}
-function shockwave(x, y) {
-  shockT = 0.45; shock.visible = true; shock.position.set(x, y + 0.05, 0); shock.scale.setScalar(0.3);
-  objs.burst(x, y + 0.1, 0, 0x5eead4, 26, 0.9); sfx.smash(); S.shake = Math.max(S.shake, 0.18);
-}
-
-window.addEventListener("keydown", (e) => {
-  const k = e.key;
-  if (menu.isOpen()) return;
-  if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(k)) e.preventDefault();
-  if ((k === "Enter" || k === " ") && (S.mode === "ready" || S.mode === "over")) { start(); return; }
-  if (k === "p" || k === "P" || k === "Escape") { setPaused(S.mode === "run"); return; }
-  if (S.mode === "paused" && (k === " " || k === "Enter")) { setPaused(false); return; }
-  if (e.repeat) return;
-  if (k === "ArrowLeft" || k === "a" || k === "A") move(-1);
-  else if (k === "ArrowRight" || k === "d" || k === "D") move(1);
-  else if (k === "ArrowUp" || k === "w" || k === "W") jump();
-  else if (k === "ArrowDown" || k === "s" || k === "S") slide();
-  else if (k === " " || k === "e" || k === "E") useBoard();
+  saveProfile(profile); renderShop(); menuInfo();
 });
-/* Dokunma: 20 px'te anında kaydırma; kaydırmasız iki dokunuş (≤ 320 ms) = kaykay */
-let sw = null, lastTap = 0, lastTouchAt = 0, lastClick = 0;
-stage.addEventListener("touchstart", (e) => { lastTouchAt = performance.now(); if (e.touches.length !== 1) return; const t = e.touches[0]; sw = { x: t.clientX, y: t.clientY, done: false }; sfx.unlock(); }, { passive: true });
-stage.addEventListener("touchmove", (e) => {
-  if (!sw || sw.done) return;
-  const t = e.touches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y;
-  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
-  sw.done = true; lastTap = 0;
-  if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1); else if (dy < 0) jump(); else slide();
-}, { passive: true });
-stage.addEventListener("touchend", (e) => {
-  if (sw && !sw.done && !(e.target.closest && e.target.closest("button,a,.dk-overlay,.dk-store,.dk-boxopen"))) {
-    const now = performance.now();
-    if (now - lastTap < 320) { useBoard(); lastTap = 0; } else lastTap = now;
-  }
-  sw = null;
-}, { passive: true });
-stage.addEventListener("touchcancel", () => { sw = null; }, { passive: true });
-/* Fare: çift tık (iki tık ≤ 320 ms). Dokunmadan doğan sentetik tıklamalar yok sayılır. */
-stage.addEventListener("click", (e) => {
-  const now = performance.now();
-  if (now - lastTouchAt < 900 || (e.target.closest && e.target.closest("button,a,.dk-overlay,.dk-store,.dk-boxopen"))) return;
-  if (now - lastClick < 320) { useBoard(); lastClick = 0; } else lastClick = now;
-});
-document.addEventListener("visibilitychange", () => { if (document.hidden && S.mode === "run") setPaused(true); });
+document.querySelectorAll("#dkShop [data-tab]").forEach(b => b.addEventListener("click", () => { shopTab = b.dataset.tab; Ses.click(); renderShop(); }));
+const openShop = () => { Ses.unlock(); Ses.click(); renderShop(); $("dkShop").hidden = false; };
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => { Ses.click(); b.closest(".dk-over").hidden = true; }));
+for (const id of ["dkShop", "dkHelp"]) $(id).addEventListener("pointerdown", ev => { if (ev.target === ev.currentTarget) ev.currentTarget.hidden = true; });
 
+/* ================= Düğmeler ================= */
 $("dkPlay").addEventListener("click", start);
 $("dkAgain").addEventListener("click", start);
-$("dkMenuBtn").addEventListener("click", goMenu);
-$("dkResume").addEventListener("click", () => setPaused(false));
-$("dkPauseBtn").addEventListener("click", () => setPaused(S.mode === "run"));
-$("dkBoardBtn").addEventListener("click", (e) => { e.stopPropagation(); useBoard(); });
-$("dkShopBtn").addEventListener("click", () => menu.openStore());
-$("dkOverShop").addEventListener("click", () => menu.openStore());
-const soundBtn = $("dkSound");
-function syncSound() { soundBtn.textContent = sfx.muted ? "🔇" : "🔊"; soundBtn.setAttribute("aria-pressed", sfx.muted ? "false" : "true"); soundBtn.setAttribute("aria-label", sfx.muted ? "Sesi aç" : "Sesi kapat"); }
-soundBtn.addEventListener("click", () => { sfx.setMuted(!sfx.muted); syncSound(); if (!sfx.muted) sfx.lane(); });
-syncSound();
+$("dkShopBtn").addEventListener("click", openShop);
+$("dkOverShop").addEventListener("click", openShop);
+$("dkHelpBtn").addEventListener("click", () => { Ses.unlock(); Ses.click(); $("dkHelp").hidden = false; });
+$("dkOverMenu").addEventListener("click", toMenu);
+$("dkQuit").addEventListener("click", toMenu);
+$("dkResume").addEventListener("click", () => pause(false));
+$("dkPauseBtn").addEventListener("click", () => pause(true));
+$("dkCapBtn").addEventListener("click", useCapsule);
+$("dkSound").addEventListener("click", () => { profile.sound = !profile.sound; Ses.setOn(profile.sound); saveProfile(profile); soundUi(); if (profile.sound) { Ses.unlock(); Ses.click(); } });
 
-/* ---------------- Toplama ve çarpışma ---------------- */
-function collect(o) {
-  if (o.type === "drop") {
-    // Su damlası: yalnızca para birimi (anlık güç vermez)
-    S.drops += 1; sfx.drop(); mission("drops", 1);
-    objs.burst(o.x, o.y, o.z, 0x22d3ee, 6, 0.5);
-  } else if (o.type === "charge") {
-    sfx.power();
-    if (S.charge < CHARGE_MAX) {
-      S.charge += 1;
-      if (S.charge >= CHARGE_MAX) toast(S.boardT > 0 ? "Kaykay şarjı dolu!" : "Kaykay şarjı %100! Çift dokun / Boşluk", "turbo");
-    } else S.pts += 50;
-    objs.burst(o.x, o.y, o.z, 0x2dd4bf, 14, 0.7);
-  } else if (o.type === "letter") {
-    S.letterOut = false; sfx.letter(); S.runStats.letters++; mission("letter", 1);
-    const w = profile.word, letters = [...w.word];
-    if (!w.done && letters[w.got] === o.ch) {
-      w.got += 1;
-      if (w.got >= letters.length) {
-        w.done = true; profile.bank += 150; profile.boxes += 1; sfx.word();
-        toast(`🎉 "${w.word}" tamamlandı! +150 Damla + 1 Gizemli Kapsül`, "turbo");
-        celebrate();
-      } else toast(`Harf: ${o.ch} (${w.got}/${letters.length})`, "sun");
-      saveProfile(profile);
-    }
-    objs.burst(o.x, o.y, o.z, 0xfacc15, 24, 0.9);
-  } else if (o.type === "box") {
-    profile.boxes += 1; saveProfile(profile); sfx.power();
-    toast("Gizemli Biyo-Kapsül! VitaMağaza'da açabilirsin", "sun"); objs.burst(o.x, o.y, o.z, 0xa855f7, 26, 1);
-  } else {
-    S.runStats.power++; mission("power", 1); sfx.power();
-    const d = upgDuration(profile, o.type);
-    if (o.type === "magnet") { S.magnetT = d; sfx.magnet(); toast(`Fe Mıknatısı: ${d} sn`, "magnet"); }
-    else if (o.type === "jet") { S.jetT = d; S.airborne = false; S.vy = 0; S.slideT = 0; S.slam = false; sfx.sun(); toast(`D3 Jet-Pack: ${d} sn uçuş!`, "sun"); }
-    else if (o.type === "boots") { S.bootsT = d; toast(`Mg Zıplama Botları: ${d} sn 2× zıplama`, "magnet"); }
-    else if (o.type === "x2") { S.x2T = d; toast(`2x Skor Çarpanı: ${d} sn`, "turbo"); }
-    objs.burst(o.x, o.y + 0.2, o.z, o.type === "magnet" ? 0xef4444 : o.type === "jet" ? 0xfacc15 : 0xa855f7, 22, 0.9);
-  }
-  objs.remove(o);
-}
-function celebrate() { const c = $("dkCelebrate"); c.hidden = false; c.classList.remove("is-on"); void c.offsetWidth; c.classList.add("is-on"); setTimeout(() => { c.hidden = true; }, 2200); for (let i = 0; i < 4; i++) objs.burst(S.x + (Math.random() - 0.5) * 4, 2 + Math.random() * 2, -4 - Math.random() * 6, [0xfacc15, 0x2dd4bf, 0xf472b6, 0xa855f7][i], 40, 1.4); }
-/* Kafa kafaya çarpma: kaykay varsa engeli parçalar, yoksa anında oyun sonu (sersemleme yok) */
-function hitObstacle(o) {
-  if (S.jetT > 0 || S.invulnT > 0) return false;
-  if (S.boardT > 0) { breakBoard(o); return false; }
-  crash("front"); return true;
-}
+/* ================= Klavye ================= */
+addEventListener("keydown", ev => {
+  const k = ev.key, c = ev.code;
+  if (k === "Escape") { const open = ["dkShop", "dkHelp"].map($).find(x => !x.hidden); if (open) open.hidden = true; else if (G.mode === "run") pause(true); else if (G.mode === "pause") pause(false); ev.preventDefault(); return; }
+  if (G.mode === "menu" || G.mode === "over") { if ((k === "Enter" || c === "Space") && $("dkShop").hidden && $("dkHelp").hidden && !ev.repeat && !(document.activeElement && document.activeElement.tagName === "BUTTON" && k === "Enter")) { ev.preventDefault(); if (!(document.activeElement && document.activeElement.tagName === "BUTTON")) start(); } return; }
+  if (G.mode !== "run") return;
+  if (k === "ArrowLeft" || c === "KeyA") moveLane(-1);
+  else if (k === "ArrowRight" || c === "KeyD") moveLane(1);
+  else if (k === "ArrowUp" || c === "KeyW") { if (!ev.repeat) jump(); }
+  else if (k === "ArrowDown" || c === "KeyS") { if (!ev.repeat) down(); }
+  else if (c === "Space" || c === "KeyE") { if (!ev.repeat) useCapsule(); }
+  else if (c === "KeyP") pause(true);
+  else return;
+  ev.preventDefault();
+});
 
-/* ---------------- Güncelleme ---------------- */
-function update(dt) {
-  S.t += dt;
-  const lvl = 1 + Math.floor(S.dist / LEVEL_M);                   // her 150 m'de belirgin hızlanma
-  if (lvl > S.level) { S.level = lvl; sfx.level(); toast(`Nabız Hızlanıyor: Seviye ${lvl}`, "level"); }
-  const base = Math.min(48, 16.5 + (S.level - 1) * 2.8 + ((S.dist % LEVEL_M) / LEVEL_M) * 1.2);
-  const target = base * (S.stumble > 0 ? 0.8 : 1);
-  S.speed += (target - S.speed) * Math.min(1, dt * 3);
-  S.dist += S.speed * dt;
-  S.pts += S.speed * dt * (S.x2T > 0 ? 2 : 1);
-  for (let l = 0; l < 3; l++) S.occ[l] = Math.max(0, S.occ[l] - S.speed * dt);
-
-  // Zamanlayıcılar
-  S.magnetT = Math.max(0, S.magnetT - dt); S.bootsT = Math.max(0, S.bootsT - dt); S.x2T = Math.max(0, S.x2T - dt);
-  S.invulnT = Math.max(0, S.invulnT - dt); S.stumble = Math.max(0, S.stumble - dt); S.introT = Math.max(0, S.introT - dt);
-  if (S.boardT > 0) { S.boardT -= dt; if (S.boardT <= 0) { S.boardT = 0; toast("Kaykay süresi doldu", "level"); } }
-  if (S.chaseT > 0) { S.chaseT -= dt; if (S.chaseT <= 0) { S.chaseT = 0; toast("Yıldızlar söndü — Toksin geri çekildi", "level"); } }
-
-  // Şerit geçişi
-  S.x += (LANES[S.lane] - S.x) * Math.min(1, dt * 14);
-  // Dikey: jet / zemin (tren çatısı, rampa) / zıplama
-  const ground = objs.groundAt(LANES[S.lane]);
-  if (S.jetT > 0) {
-    S.jetT -= dt; S.y += (5.4 - S.y) * Math.min(1, dt * 3); S.airborne = false;
-    if (S.jetT <= 0) { S.jetT = 0; S.airborne = true; S.vy = 0; S.noFlip = true; S.airT = 0; S.invulnT = 1.2; }
-  } else if (S.airborne) {
-    S.vy -= G * dt; S.y += S.vy * dt; S.airT += dt;
-    if (S.y <= ground.h && S.vy <= 0) {
-      S.y = ground.h; S.vy = 0; S.airborne = false;
-      if (S.slam) { S.slam = false; shockwave(S.x, S.y); }
-      if (S.queuedSlide) { S.queuedSlide = false; S.slideT = 0.7; }
-    }
-  } else {
-    if (ground.h > S.y + 0.02) { if (ground.onRamp || ground.h - S.y < 0.7 || S.invulnT > 0) S.y = ground.h; }  // rampadan yürüyerek çıkış
-    else if (ground.h < S.y - 0.05) { S.airborne = true; S.vy = 0; S.airT = 0; S.noFlip = true; }                // çatıdan boşluğa
-    else S.y = ground.h;
-  }
-  if (!S.airborne && S.jetT <= 0 && S.y > CAPSULE.top - 0.2) S.roofDist += S.speed * dt;
-  if (S.slideT > 0) S.slideT = Math.max(0, S.slideT - dt);
-  S.slideK += ((S.slideT > 0 ? 1 : 0) - S.slideK) * Math.min(1, dt * 16);
-  // Kaykay neon izi parçacıkları
-  if (S.boardT > 0 && Math.random() < 0.7) objs.burst(S.x + (Math.random() - 0.5) * 0.4, S.y + 0.08, 0.5, profile.sel.board === "magnezyum" ? 0xc084fc : 0x2dd4bf, 1, 0.15);
-
-  // Sıralar
-  S.untilRow -= S.speed * dt;
-  if (S.untilRow <= 0) { spawnRow(SPAWN_Z); S.untilRow = Math.max(9.5, 21 - S.level * 1.3) + Math.random() * 4; }
-
-  // Nesneler
-  const ph = S.slideK > 0.5 ? 0.7 : 1.75, list = objs.list;
-  for (let i = list.length - 1; i >= 0; i--) {
-    const o = list[i];
-    if (!o.alive) { list.splice(i, 1); continue; }
-    const dz = (S.speed + (o.vz || 0)) * dt;
-    o.z += dz; o.t += dt;
-    if (o.moving) o.x = LANES[o.moving.from] + (LANES[o.moving.to] - LANES[o.moving.from]) * (Math.sin(o.t * o.moving.w) + 1) / 2;
-    let bob = 0;
-    if (o.type === "drop") {
-      o.mesh.rotation.y += dt * 3;
-      if (S.magnetT > 0 && o.z > -30 && o.z < 1.5) { const k = Math.min(1, dt * 7); o.x += (S.x - o.x) * k; o.y += (S.y + 0.9 - o.y) * k; o.z += (0 - o.z) * k * 0.6; o.ride = null; o.vz = 0; } // zemin + çatı
-      bob = Math.sin(o.t * 4) * 0.08;
-    } else if (o.type === "virus") {
-      const c = o.mesh.userData.core; c.rotation.x += dt * 1.2; c.rotation.y += dt * 1.7;
-      c.scale.setScalar(1 + Math.sin(o.t * 5.5) * 0.07);                     // nabız gibi büyüyüp küçülme
-      o.mesh.children[0].rotation.y += dt * 0.6;
-    } else if (o.type !== "capsule" && !OB[o.type]) {
-      o.mesh.rotation.y += dt * 2.6; bob = Math.sin(o.t * 3) * 0.15;
-      const rg = o.mesh.userData.rings; if (rg) { rg[0].rotation.x += dt * 2.2; rg[0].rotation.z += dt * 1.1; rg[1].rotation.y += dt * 2.8; rg[1].rotation.x -= dt * 1.4; }
-    }
-    o.mesh.position.set(o.x, o.y + bob, o.z);
-
-    if (S.mode === "run") {
-      if (o.type === "capsule") {
-        const front = o.z + o.len / 2, prevFront = front - dz;
-        // Ön yüze kafa kafaya: bu karede ön yüz oyuncunun hizasından geçti ve oyuncu çatı seviyesinin altında
-        if (Math.abs(o.x - S.x) < 1.0 && prevFront <= 0.55 && front >= -0.25 && S.y < CAPSULE.top - 0.45) {
-          if (hitObstacle(o)) break;
-          if (!o.alive) { list.splice(i, 1); continue; }
-        }
-      } else if (OB[o.type]) {
-        const b = OB[o.type], r = b.hz + 0.35;
-        if (o.z >= -r && o.z - dz <= r && Math.abs(o.x - S.x) < b.hx + 0.32 && S.y < b.y1 && S.y + ph > b.y0) {
-          if (hitObstacle(o)) break;
-          if (!o.alive) { list.splice(i, 1); continue; }
-        }
-      } else if (Math.abs(o.x - S.x) < 0.85 && o.z > -0.9 && o.z - dz < 0.9 && o.y > S.y - 0.4 && o.y < S.y + ph + 0.4) { collect(o); list.splice(i, 1); continue; }
-    }
-    const tail = o.type === "capsule" ? o.z - o.len / 2 : o.z;
-    if (tail > 9) { if (o.type === "letter") S.letterOut = false; objs.remove(o); list.splice(i, 1); }
-  }
-  // Karşıdan gelen tren, şeridindeki eşyaları önüne katar (iç içe geçme olmaz)
-  for (const tr of list) {
-    if (tr.type !== "capsule" || !tr.vz || !tr.alive) continue;
-    const front = tr.z + tr.len / 2 + 0.6, back = tr.z - tr.len / 2;
-    for (const q of list) {
-      if (q === tr || !q.alive || q.ride === tr || q.type === "capsule" || Math.abs(q.x - tr.x) > 1.1 || q.z > front || q.z < back) continue;
-      if (q.type === "letter") S.letterOut = false;
-      objs.remove(q);
-    }
-  }
-}
-
-/* ---------------- Döngü ---------------- */
-let last = performance.now();
-const camPos = new THREE.Vector3(0, 3.2, 5.7), camLook = new THREE.Vector3(0, 1.3, -9);
-function frame(now) {
-  requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (S.mode === "run") update(dt);
-  else if (S.mode === "crashing") { S.crashT += dt; S.speed *= Math.pow(0.02, dt); if (S.crashReason === "chaser") S.chaserZ += (0.9 - S.chaserZ) * Math.min(1, dt * 6); if (S.crashT > 0.75) gameOver(); }
-  const paused = S.mode === "paused";
-  const flow = S.mode === "run" || S.mode === "crashing" ? S.speed : S.mode === "ready" ? 6 : 0;
-  const bpm = 72 + (S.level - 1) * 10 + (S.chaseT > 0 ? 30 : 0);
-  world.update(paused ? 0 : dt, flow, paused ? 0.001 : bpm);
-  objs.updateParticles(paused ? 0 : dt, flow);
-  runner.group.position.set(S.x, S.y, 0);
-  runner.update(paused ? 0 : dt, {
-    running: S.mode === "run" || S.mode === "ready", speed: flow, airborne: S.airborne && !S.noFlip && !S.slam, airT: S.airT, airDur: S.airDur,
-    slideK: S.slideK, flying: S.jetT > 0, hydration: S.charge / CHARGE_MAX * 100, shield: false, turbo: false, crashed: S.mode === "crashing" || S.mode === "over",
-    board: S.boardT > 0, boots: S.bootsT > 0, stumble: S.stumble, stunned: S.mode === "run" || S.mode === "paused" ? S.chaseT : 0
-  });
-  runner.group.visible = !(S.invulnT > 0 && Math.floor(S.t * 14) % 2 === 0);
-  // Kovalayan Toksin: başlangıçta 2 sn ve sersemlemede enseden takip; sonra ekranın altına doğru geride kalır
-  const chasing = S.chaseT > 0 || S.introT > 0;
-  if (S.mode !== "crashing" && !paused) S.chaserZ += ((chasing ? 2.5 : 16) - S.chaserZ) * Math.min(1, dt * 3);
-  const lurk = S.mode === "crashing" ? 0 : S.introT > 0 ? 1.6 : 1.55 * Math.tanh(3 * Math.sin(performance.now() / 1100));  // ekran kenarları arasında süzülür, oyuncuyu kapatmaz
-  chaser.visible = S.chaserZ < 13; chaser.position.set(S.x * 0.55 + lurk, 0.3 + Math.sin(performance.now() / 180) * 0.1, S.chaserZ);
-  const dangerOn = chasing && S.mode === "run";
-  if (dangerOn !== dangerShown) { dangerShown = dangerOn; dangerEl.hidden = !dangerOn; }
-  if (dangerOn) { const txt = S.chaseT > 0 ? `Toksin peşinde · ${Math.ceil(S.chaseT)} sn` : "Toksin arkanda!"; if (dangerTxt.textContent !== txt) dangerTxt.textContent = txt; }
-  if (chaser.visible && !paused) { chaserMic.core.rotation.y += dt * 1.5; chaserMic.core.rotation.x += dt * 0.7; chaserMic.core.scale.setScalar(1 + Math.sin(performance.now() / 160) * 0.06); }
-  // Şok dalgası
-  if (shockT > 0 && !paused) { shockT -= dt; const k = 1 - shockT / 0.45; shock.scale.setScalar(0.3 + k * 3.2); shock.material.opacity = 0.85 * (1 - k); if (shockT <= 0) shock.visible = false; }
-  world.glow.position.set(S.x, S.y + 2.4, 1.6);
-  camPos.set(S.x * 0.55, 3.2 + S.y * 0.55, 5.7); camLook.set(S.x * 0.55, 1.3 + S.y * 0.5, -9);
-  camera.position.lerp(camPos, Math.min(1, dt * 8));
-  if (S.shake > 0) { S.shake = Math.max(0, S.shake - dt); const k = S.shake * 0.9; camera.position.x += (Math.random() - 0.5) * k; camera.position.y += (Math.random() - 0.5) * k; }
-  camera.lookAt(camLook);
-  const fovT = (stage.clientWidth / stage.clientHeight < 0.75 ? 74 : 64) + Math.min(8, (S.level - 1) * 1.2) * (S.mode === "run" ? 1 : 0);
-  if (Math.abs(camera.fov - fovT) > 0.05) { camera.fov += (fovT - camera.fov) * Math.min(1, dt * 4); camera.updateProjectionMatrix(); }
-  if (S.mode === "run") adaptPR(dt);
-  renderer.render(scene, camera);
-  if (S.mode === "run" || S.mode === "crashing") renderHud();
-  const playing = S.mode !== "ready";
-  if (playing !== stagePlaying) { stagePlaying = playing; stage.classList.toggle("is-playing", playing); }
-}
-let stagePlaying = null;
-renderHud(true);
-requestAnimationFrame(frame);
-$("dkLoading").hidden = true;
-$("dkPlay").disabled = false;
-
-/* Test ve hata ayıklama arayüzü */
-window.DamarKosucusu = {
-  state: () => ({ mode: S.mode, lane: S.lane, x: +S.x.toFixed(2), y: +S.y.toFixed(2), airborne: S.airborne, sliding: S.slideK > 0.5, slam: S.slam, speed: +S.speed.toFixed(1), dist: Math.floor(S.dist), drops: S.drops, score: score(), level: S.level, charge: S.charge, magnet: S.magnetT, jet: S.jetT, boots: S.bootsT, x2: S.x2T, board: S.boardT, chase: S.chaseT, intro: S.introT, chaserZ: +S.chaserZ.toFixed(2), stumble: S.stumble, invuln: S.invulnT, roof: Math.floor(S.roofDist), crashReason: S.crashReason, objects: objs.list.length, capsules: objs.list.filter(o => o.type === "capsule").length, movingTrains: objs.list.filter(o => o.type === "capsule" && o.vz).length, gen: Object.assign({}, S.gen), shock: shockT > 0 }),
-  profile: () => JSON.parse(JSON.stringify(profile)),
-  start, makeRowPattern, useBoard,
-  debug: {
-    clear: () => objs.clear(),
-    spawn: (type, lane, z, y, extra) => { objs.spawn(type, lane, z, y !== undefined ? y : (type === "drop" ? 0.55 : OB[type] || type === "capsule" ? 0 : 1.1), extra || (type === "capsule" ? { len: 16, ramp: false, color: 0 } : type === "letter" ? { ch: [...profile.word.word][profile.word.got] } : {})); },
-    set: (patch) => Object.assign(S, patch),
-    holdRows: (v) => { S.untilRow = v ? 1e9 : 10; },
-    setProfile: (patch) => { Object.assign(profile, patch); saveProfile(profile); applyLook(); menu.renderHome(); renderHud(true); },
-    ground: () => objs.groundAt(LANES[S.lane]),
-    look: () => applied,
-    render: () => Object.assign({}, renderer.info.render),
-    scene: () => scene,
-    pixelRatio: () => curPR
-  }
+/* ================= Dokunmatik: eşik geçildiği anda tepki veren kaydırma + çift dokunma ================= */
+const ptr = { id: null, x: 0, y: 0, t: 0, fired: false, moved: 0 }; let lastTap = 0;
+const TH = () => Math.max(14, Math.min(26, R.view.W * 0.045));
+canvas.addEventListener("pointerdown", ev => { Ses.unlock(); ptr.id = ev.pointerId; ptr.x = ev.clientX; ptr.y = ev.clientY; ptr.t = performance.now(); ptr.fired = false; ptr.moved = 0; try { canvas.setPointerCapture(ev.pointerId); } catch (_) {} ev.preventDefault(); });
+canvas.addEventListener("pointermove", ev => {
+  if (ev.pointerId !== ptr.id) return;
+  const dx = ev.clientX - ptr.x, dy = ev.clientY - ptr.y, th = TH(); ptr.moved = Math.max(ptr.moved, Math.abs(dx), Math.abs(dy));
+  if (Math.abs(dx) < th && Math.abs(dy) < th) return;
+  if (Math.abs(dx) > Math.abs(dy)) moveLane(dx > 0 ? 1 : -1); else if (dy < 0) jump(); else down();
+  ptr.fired = true; ptr.x = ev.clientX; ptr.y = ev.clientY;       // parmak kalkmadan zincirleme kaydırma
+});
+const ptrEnd = ev => {
+  if (ev.pointerId !== ptr.id) return; ptr.id = null;
+  const now = performance.now();
+  if (!ptr.fired && ptr.moved < 12 && now - ptr.t < 260 && ev.type === "pointerup") { if (now - lastTap < 330) { lastTap = 0; useCapsule(); } else lastTap = now; }
 };
+canvas.addEventListener("pointerup", ptrEnd); canvas.addEventListener("pointercancel", ptrEnd);
+for (const t of ["touchmove", "gesturestart", "dblclick", "contextmenu"]) document.addEventListener(t, ev => ev.preventDefault(), { passive: false });
+
+/* ================= Döngü ================= */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000)); last = now;
+  if (G.mode !== "pause") { let rem = dt; while (rem > 0.0001) { const s = Math.min(rem, 1 / 90); update(s); rem -= s; } G.dt = dt; }   // alt adımlar: yüksek hızda tünelleme olmaz
+  else G.dt = 0;
+  R.draw(G);
+  requestAnimationFrame(frame);
+}
+function resize() { R.resize(); }
+addEventListener("resize", resize); addEventListener("orientationchange", () => setTimeout(resize, 120));
+if (window.visualViewport) visualViewport.addEventListener("resize", resize);
+document.addEventListener("visibilitychange", () => { if (document.hidden) pause(true); });
+addEventListener("blur", () => pause(true));
+
+resize(); soundUi(); menuInfo(); saveProfile(profile);
+requestAnimationFrame(frame);
+
+/* Test / hata ayıklama kancası */
+window.DamarKosucusu = { G, start, toMenu, pause, input: { left: () => moveLane(-1), right: () => moveLane(1), jump, down, capsule: useCapsule }, profile: () => profile,
+  debug: { add, clear() { G.ents = []; G.genD = 1e9; }, resume() { G.genD = G.dist + 30; }, setProfile(p) { Object.assign(profile, p); saveProfile(profile); menuInfo(); hud(true); }, step: update, PAT, mult } };

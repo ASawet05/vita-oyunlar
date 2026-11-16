@@ -2,148 +2,138 @@
 <html lang="tr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Damar Yolu Koşucusu · Vita Oyunlar</title>
-<meta name="description" content="Damar Yolu Koşucusu: Nano-Koruyucu ile damar tünelinde koşun, dev vitamin kapsüllerinin çatısına tırmanın, kaykay kullanın, VitaMağaza'dan kostüm ve aksesuar alın.">
-<meta name="theme-color" content="#14040a">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2314040a'/%3E%3Cpath d='M32 10c8 12 14 20 14 28a14 14 0 0 1-28 0c0-8 6-16 14-28z' fill='%2322d3ee'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" crossorigin>
-<link rel="stylesheet" href="css/ortak.css">
+<meta name="description" content="Damar Yolu Koşucusu: üç şeritli damar tünelinde koşun, vitamin toplayın, trambolinle fibrin köprülerine çıkın, Biyo-Sörf Kapsülü ile engelleri parçalayın.">
+<meta name="theme-color" content="#22050d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2322050d'/%3E%3Ccircle cx='32' cy='32' r='15' fill='%23fde047' stroke='%23fffbeb' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/damar-kosucusu.css">
 </head>
-<body class="dk-body">
-<header class="dk-bar">
-  <a class="dk-back" href="index.html" aria-label="Oyunlar menüsüne dön"><span class="bk-long">← Oyunlar Menüsü</span><span class="bk-short">← Menü</span></a>
-  <div class="dk-stats" aria-live="off">
-    <div class="dk-stat"><small>Skor</small><b id="dkScore">0</b><span id="dkDist">0 m</span></div>
-    <div class="dk-stat dk-stat--drop"><small>💧<span class="lbl-long"> Damla</span></small><b id="dkDrops">0</b></div>
-    <div class="dk-stat dk-stat--best"><small>Rekor</small><b id="dkBest">0</b></div>
-  </div>
-  <div class="dk-btns">
-    <button type="button" class="dk-icon" id="dkPauseBtn" aria-label="Duraklat" disabled>⏸</button>
-    <button type="button" class="dk-icon" id="dkSound" aria-pressed="true" aria-label="Sesi kapat">🔊</button>
-  </div>
-</header>
+<body>
+<div class="dk" id="dkStage">
+  <canvas id="dkCanvas" aria-label="Damar Yolu Koşucusu oyun alanı"></canvas>
 
-<div class="dk-stage" id="dkStage">
-  <canvas id="dkCanvas" aria-label="Damar Yolu Koşucusu 3D oyun alanı"></canvas>
-  <div class="dk-hydwrap dk-hud" aria-label="Kelime ve aktif etkiler">
-    <div class="dk-word" id="dkWord" role="img" aria-label="Günün kelimesi"></div>
-    <div class="dk-chips" id="dkChips" aria-live="polite"></div>
+  <!-- Oyun içi minimalist HUD -->
+  <div class="dk-hud" id="dkHud" hidden>
+    <div class="dk-tl" aria-live="off">
+      <b class="dk-score" id="dkScore">0</b>
+      <div class="dk-sub"><span class="dk-mult" id="dkMult">x1</span><span class="dk-vp"><i class="dk-coin" aria-hidden="true"></i><span id="dkVp">0</span></span></div>
+    </div>
+    <div class="dk-tr">
+      <button type="button" class="dk-ic" id="dkSound" aria-label="Sesi kapat" aria-pressed="true"></button>
+      <button type="button" class="dk-ic" id="dkPauseBtn" aria-label="Duraklat"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg></button>
+    </div>
+    <div class="dk-mission" id="dkMission" hidden role="status"></div>
+    <div class="dk-rings" id="dkRings" aria-hidden="true"></div>
+    <button type="button" class="dk-cap" id="dkCapBtn" aria-label="Biyo-Sörf Kapsülü kullan">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="6" y="17" width="36" height="14" rx="7" class="dk-cap-body"/><path d="M24 17v14" class="dk-cap-line"/><path d="M12 36q12 6 24 0" class="dk-cap-wave"/></svg>
+      <b id="dkCapN">0</b>
+    </button>
+    <div class="dk-toast" id="dkToast" hidden role="status"></div>
   </div>
-  <div class="dk-toasts" id="dkToasts" aria-live="polite"></div>
-  <div class="dk-danger" id="dkDanger" hidden role="status"><i aria-hidden="true">!</i><span>Toksin arkanda!</span></div>
-  <button type="button" class="dk-charge" id="dkBoardBtn" aria-label="Nano-Kaykay şarjı" disabled>
-    <span class="dk-charge-board" aria-hidden="true"><svg viewBox="0 0 40 120"><defs><clipPath id="dkBoardClip"><path d="M20 4c9 0 14 6 14 14v84c0 8-5 14-14 14S6 110 6 102V18C6 10 11 4 20 4z"/></clipPath></defs><path class="dk-charge-shell" d="M20 4c9 0 14 6 14 14v84c0 8-5 14-14 14S6 110 6 102V18C6 10 11 4 20 4z"/><g clip-path="url(#dkBoardClip)"><rect class="dk-charge-fill" x="0" y="0" width="40" height="120"/></g><path class="dk-charge-line" d="M20 14v92M12 30h16M12 90h16"/><circle class="dk-charge-wheel" cx="8" cy="30" r="3"/><circle class="dk-charge-wheel" cx="32" cy="30" r="3"/><circle class="dk-charge-wheel" cx="8" cy="90" r="3"/><circle class="dk-charge-wheel" cx="32" cy="90" r="3"/></svg></span>
-    <em>0%</em><b>0</b>
-  </button>
-  <div class="dk-celebrate" id="dkCelebrate" hidden aria-hidden="true"><span>🎉 KELİME TAMAM! 🎉</span></div>
 
-  <div class="dk-overlay" id="dkStart">
-    <div class="dk-card dk-card--home">
-      <h1>Damar Yolu Koşucusu</h1>
-      <div class="dk-wallet">
-        <div><small>Damla Bankası</small><b>💧 <span id="dkBank">0</span></b></div>
-        <div><small>Kaykay</small><b>🛹 <span id="dkBoardStock">0</span></b></div>
-        <div><small>Skor Çarpanı</small><b id="dkMult">x1</b></div>
-      </div>
-      <section class="dk-sec" aria-labelledby="dkMisH">
-        <h2 class="dk-sec-h" id="dkMisH">🎯 Görevler <small>3'ü bitince çarpan +1</small></h2>
-        <ul class="dk-missions" id="dkMissions"></ul>
-      </section>
-      <section class="dk-sec" aria-labelledby="dkWordH">
-        <h2 class="dk-sec-h" id="dkWordH">🔤 Günün Kelimesi <small>altın harf kürelerini topla</small></h2>
-        <div class="dk-word dk-word--home" id="dkWordHome"></div>
-      </section>
-      <details class="dk-help">
-        <summary>Kontroller ve parkur</summary>
-        <div class="dk-controls">
-          <div><b>📱 Telefon</b><span>← → kaydır: şerit · ↑ zıpla · ↓ kay (havadayken: hızlı iniş) · <em>çift dokun: kaykay</em></span></div>
-          <div><b>⌨️ Klavye / fare</b><span>← → / A D: şerit · ↑ / W: zıpla · ↓ / S: kay / hızlı iniş · <em>Boşluk / E / çift tık: kaykay</em> · P: duraklat</span></div>
-          <div><b>💧 Damla &amp; 🛹 Şarj</b><span>Su damlaları yalnızca para (VitaMağaza). Turkuaz enerji kapsülleri sağ üstteki kaykay şarjını doldurur: 10 kapsül = %100.</span></div>
-          <div><b>💥 Çarpma kuralları</b><span>Önden kafa kafaya = oyun biter (kaykay varsa engeli parçalar). Yandan sürtme = sersemleme + Toksin peşinde; yıldızlar sönmeden (6 sn) ikinci hata = yakalanırsın.</span></div>
-        </div>
-        <ul class="dk-legend">
-          <li><i style="--c:#f59e0b"></i><b>Plak</b> zıpla</li>
-          <li><i style="--c:#7c3aed"></i><b>Toksin kapısı</b> kay</li>
-          <li><i style="--c:#dc2626"></i><b>Virüs</b> şerit değiştir</li>
-          <li><i style="--c:#f97316"></i><b>Kapsül tren</b> rampadan çatıya</li>
-          <li><i style="--c:#f8fafc"></i><b>Farlı tren</b> karşıdan gelir</li>
-          <li><i style="--c:#2dd4bf"></i><b>Enerji kapsülü</b> kaykay şarjı</li>
-          <li><i style="--c:#c084fc"></i><b>2x küresi</b> skor iki katı</li>
-          <li><i style="--c:#facc15"></i><b>D3 Jet-Pack</b> 10 sn uçuş</li>
-          <li><i style="--c:#a855f7"></i><b>Mg Botları</b> 2× zıplama</li>
-          <li><i style="--c:#ef4444"></i><b>Fe Mıknatısı</b> damla çeker</li>
-          <li><i style="--c:#fde047"></i><b>Yan sürtme</b> sersemleme</li>
-        </ul>
-      </details>
-      <p class="dk-loading" id="dkLoading">3D motor yükleniyor…</p>
-      <div class="dk-home-acts">
-        <button type="button" class="vo-btn dk-play" id="dkPlay" disabled>▶ Koşmaya Başla</button>
-        <button type="button" class="vo-btn vo-btn--ghost dk-shopbtn" id="dkShopBtn">🛒 VitaMağaza <span class="dk-badge" id="dkBoxBadge" hidden>0</span></button>
-      </div>
+  <!-- Ana menü -->
+  <div class="dk-menu" id="dkMenu">
+    <a class="dk-ic dk-home" href="index.html" aria-label="Oyunlar menüsüne dön"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    <div class="dk-wallet" aria-label="Vita-Puan bakiyesi"><i class="dk-coin" aria-hidden="true"></i><b id="dkBank">0</b></div>
+    <div class="dk-logo">
+      <svg class="dk-logo-mark" viewBox="0 0 120 120" aria-hidden="true">
+        <defs><linearGradient id="dkLg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5eead4"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="#fb7185" stroke-width="5" opacity=".9"/>
+        <circle cx="60" cy="60" r="38" fill="none" stroke="#fb7185" stroke-width="3" opacity=".5"/>
+        <circle cx="60" cy="60" r="25" fill="none" stroke="#fb7185" stroke-width="2" opacity=".28"/>
+        <path d="M38 96L52 60 60 44 68 60 82 96z" fill="#3a0912" stroke="#fda4af" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="60" cy="50" r="9" fill="#f1f5f9"/><rect x="51" y="58" width="18" height="22" rx="7" fill="#f1f5f9"/><rect x="57" y="60" width="6" height="16" rx="3" fill="url(#dkLg)"/>
+        <path d="M51 49h18" stroke="url(#dkLg)" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="26" cy="38" r="7" fill="#fde047" stroke="#fffbeb" stroke-width="2"/><circle cx="96" cy="46" r="6" fill="#fb7185" stroke="#ffe4e6" stroke-width="2"/>
+      </svg>
+      <h1><span>Damar Yolu</span><b>Koşucusu</b></h1>
+      <p class="dk-best" id="dkBestLine"></p>
+    </div>
+    <button type="button" class="dk-play" id="dkPlay">OYNA</button>
+    <div class="dk-menu-ic">
+      <button type="button" class="dk-ic dk-ic--lg" id="dkShopBtn" aria-label="Biyo-Mağaza"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 11H6.2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Biyo-Mağaza</span></button>
+      <button type="button" class="dk-ic dk-ic--lg" id="dkHelpBtn" aria-label="Nasıl oynanır"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9.2a2.9 2.9 0 1 1 4.3 2.6c-.9.5-1.5 1.1-1.5 2.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="17.6" r="1.3"/></svg><span>Nasıl Oynanır</span></button>
     </div>
   </div>
 
-  <div class="dk-overlay" id="dkPause" hidden>
-    <div class="dk-card dk-card--small">
+  <!-- Duraklatma -->
+  <div class="dk-over" id="dkPause" hidden role="dialog" aria-modal="true" aria-label="Duraklatıldı">
+    <div class="dk-card dk-card--sm">
       <h2>Duraklatıldı</h2>
-      <button type="button" class="vo-btn" id="dkResume">▶ Devam et</button>
+      <button type="button" class="dk-btn" id="dkResume">Devam Et</button>
+      <button type="button" class="dk-btn dk-btn--ghost" id="dkQuit">Ana Menü</button>
     </div>
   </div>
 
-  <div class="dk-overlay" id="dkOver" hidden role="dialog" aria-modal="true" aria-labelledby="dkOverTitle">
+  <!-- Oyun sonu -->
+  <div class="dk-over" id="dkOver" hidden role="dialog" aria-modal="true" aria-labelledby="dkOverTitle">
     <div class="dk-card">
-      <div class="dk-card-emoji" aria-hidden="true">💥</div>
       <h2 id="dkOverTitle">Damar Tıkandı!</h2>
-      <div class="dk-over-grid">
-        <div><small>Mesafe</small><b id="dkOverDist">0 m</b></div>
-        <div><small>Kazanılan damla</small><b id="dkOverDrops">+0</b></div>
+      <p class="dk-record" id="dkRecord" hidden>Yeni rekor!</p>
+      <div class="dk-res">
         <div><small>Skor</small><b id="dkOverScore">0</b></div>
-        <div><small>Rekor</small><b id="dkOverBest">0</b></div>
+        <div><small>En yüksek</small><b id="dkOverBest">0</b></div>
+        <div><small>Vita-Puan</small><b><i class="dk-coin" aria-hidden="true"></i><span id="dkOverVp">+0</span></b></div>
       </div>
-      <p class="dk-over-bank">Damla Bankası: 💧 <b id="dkOverBank">0</b></p>
-      <p class="dk-over-note" id="dkOverNote"></p>
-      <div class="vo-modal-actions">
-        <button type="button" class="vo-btn" id="dkAgain">↻ Tekrar Koş</button>
-        <button type="button" class="vo-btn vo-btn--ghost" id="dkOverShop">🛒 VitaMağaza</button>
-        <button type="button" class="vo-btn vo-btn--ghost" id="dkMenuBtn">🏠 Ana Ekran</button>
+      <p class="dk-fact" id="dkFact"></p>
+      <button type="button" class="dk-btn dk-btn--big" id="dkAgain">Tekrar Oyna</button>
+      <div class="dk-card-row">
+        <button type="button" class="dk-link" id="dkOverShop">Biyo-Mağaza</button>
+        <button type="button" class="dk-link" id="dkOverMenu">Ana Menü</button>
       </div>
     </div>
   </div>
 
-  <div class="dk-overlay" id="dkFatal" hidden>
-    <div class="dk-card dk-card--small"><h2>Oyun başlatılamadı</h2><p></p><a class="vo-btn" href="index.html">Oyunlar Menüsü</a></div>
-  </div>
-
-  <div class="dk-store" id="dkStore" hidden role="dialog" aria-modal="true" aria-labelledby="dkStoreTitle">
-    <div class="dk-store-sheet">
-      <div class="dk-store-head">
-        <h2 id="dkStoreTitle">🛒 VitaMağaza</h2>
-        <span class="dk-store-bank">💧 <b id="dkStoreBank">0</b></span>
-        <button type="button" class="dk-icon" id="dkStoreClose" aria-label="Mağazayı kapat">✕</button>
+  <!-- Biyo-Mağaza -->
+  <div class="dk-over dk-sheet" id="dkShop" hidden role="dialog" aria-modal="true" aria-labelledby="dkShopTitle">
+    <div class="dk-card dk-card--wide">
+      <div class="dk-sheet-head">
+        <h2 id="dkShopTitle">Biyo-Mağaza</h2>
+        <span class="dk-wallet dk-wallet--in"><i class="dk-coin" aria-hidden="true"></i><b id="dkShopBank">0</b></span>
+        <button type="button" class="dk-ic" data-close aria-label="Kapat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
       </div>
       <div class="dk-tabs" role="tablist">
-        <button type="button" role="tab" data-tab="chars">🧍 Kostümler</button>
-        <button type="button" role="tab" data-tab="boards">🛹 Kaykaylar</button>
-        <button type="button" role="tab" data-tab="upg">🚀 Güçlendiriciler</button>
-        <button type="button" role="tab" data-tab="acc">✨ Aksesuarlar &amp; Koleksiyon</button>
-        <button type="button" role="tab" data-tab="box">💊 Gizemli Kapsül</button>
+        <button type="button" role="tab" data-tab="chars" aria-selected="true">Karakterler</button>
+        <button type="button" role="tab" data-tab="caps" aria-selected="false">Kapsüller</button>
+        <button type="button" role="tab" data-tab="stock" aria-selected="false">Stok</button>
       </div>
-      <div class="dk-store-body" id="dkStoreBody" role="tabpanel"></div>
+      <div class="dk-shop-body" id="dkShopBody" role="tabpanel"></div>
     </div>
   </div>
 
-  <div class="dk-boxopen" id="dkBoxOpen" hidden role="dialog" aria-modal="true" aria-label="Gizemli Kapsül açılıyor">
-    <div class="dk-boxopen-in">
-      <div class="dk-box-cap" id="dkBoxCap" aria-hidden="true"><span>💊</span></div>
-      <div class="dk-box-result" id="dkBoxResult" hidden aria-live="polite"></div>
-      <button type="button" class="vo-btn" id="dkBoxOk" hidden>Harika!</button>
+  <!-- Nasıl oynanır -->
+  <div class="dk-over dk-sheet" id="dkHelp" hidden role="dialog" aria-modal="true" aria-labelledby="dkHelpTitle">
+    <div class="dk-card dk-card--wide">
+      <div class="dk-sheet-head">
+        <h2 id="dkHelpTitle">Nasıl Oynanır</h2>
+        <button type="button" class="dk-ic" data-close aria-label="Kapat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button>
+      </div>
+      <div class="dk-help">
+        <table>
+          <thead><tr><th>Hareket</th><th>Telefon</th><th>Klavye</th></tr></thead>
+          <tbody>
+            <tr><td>Şerit değiştir</td><td>Sola / sağa kaydır</td><td>← → veya A D</td></tr>
+            <tr><td>Zıpla</td><td>Yukarı kaydır</td><td>↑ veya W</td></tr>
+            <tr><td>Kay / havada yere çakıl</td><td>Aşağı kaydır</td><td>↓ veya S</td></tr>
+            <tr><td>Biyo-Sörf Kapsülü</td><td>Çift dokun</td><td>Boşluk veya E</td></tr>
+            <tr><td>Duraklat</td><td>⏸ düğmesi</td><td>Esc</td></tr>
+          </tbody>
+        </table>
+        <ul>
+          <li><b>Plak birikintisi:</b> üzerinden zıpla. <b>Pıhtı kemeri:</b> altından kay. <b>Pıhtı duvarı ve serbest radikal:</b> şerit değiştir.</li>
+          <li><b>Trambolin ve enzim rampası</b> seni fibrin köprülerine çıkarır; nadir vitaminler orada.</li>
+          <li>Bir engele sürtünürsen <b>Toksin Dalgası</b> 6 saniye peşine düşer; bu sürede ikinci hata turu bitirir.</li>
+          <li>Hiç kaçırmadan <b>25 vitamin</b> topla: 5 saniyelik <b>Biyo-Frenzy</b> (engelleri ez, 3 kat puan).</li>
+          <li><b>Kapsül</b> 10 saniye korur; ilk çarpmada engeli parçalar ve kırılır.</li>
+        </ul>
+      </div>
     </div>
   </div>
 </div>
-
 <script type="module" src="js/damar-kosucusu.js"></script>
 </body>
 </html>

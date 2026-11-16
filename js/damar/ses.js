@@ -1,67 +1,59 @@
-/* Damar Yolu Koşucusu — Web Audio ile kodla üretilen sesler (harici ses dosyası yok). */
-export function createAudio(storageKey) {
-  let ctx = null, master = null;
-  let muted = false;
-  try { muted = localStorage.getItem(storageKey) === "1"; } catch (_) {}
+/* Damar Yolu Koşucusu — sesler tamamen Web Audio API ile sentezlenir (ses dosyası yok). */
+let ctx = null, master = null, on = true, noiseBuf = null;
+const SCALE = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24]; // majör pentatonik, iki oktav
 
-  function ac() {
-    if (muted) return null;
-    try {
-      if (!ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return null;
-        ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination);
-      }
-      if (ctx.state === "suspended") ctx.resume();
-      return ctx;
-    } catch (_) { return null; }
+function ac() {
+  if (!ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = on ? 0.5 : 0; master.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
-  function tone(freq, dur, type = "sine", vol = 0.12, slideTo = 0, delay = 0) {
-    const c = ac(); if (!c) return;
-    const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
-    o.type = type; o.frequency.setValueAtTime(freq, t);
-    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.03);
-  }
-  function noise(dur, vol = 0.12, freq = 1500, type = "lowpass", sweepTo = 0) {
-    const c = ac(); if (!c) return;
-    const len = Math.max(1, Math.floor(c.sampleRate * dur)), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
-    s.buffer = buf; f.type = type; f.frequency.setValueAtTime(freq, c.currentTime);
-    if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, c.currentTime + dur);
-    g.gain.value = vol; s.connect(f); f.connect(g); g.connect(master); s.start();
-  }
-  return {
-    unlock: () => ac(),
-    get muted() { return muted; },
-    setMuted(m) {
-      muted = m;
-      try { localStorage.setItem(storageKey, m ? "1" : "0"); } catch (_) {}
-      if (ctx) { try { m ? ctx.suspend() : ctx.resume(); } catch (_) {} }
-    },
-    drop() { const f = 880 + Math.random() * 220; tone(f, 0.09, "sine", 0.07, f * 1.5); },
-    jump() { tone(300, 0.18, "triangle", 0.1, 620); },
-    slide() { noise(0.22, 0.08, 2400, "bandpass", 600); },
-    lane() { tone(520, 0.04, "sine", 0.03); },
-    power() { [660, 880, 1320].forEach((f, i) => tone(f, 0.12, "triangle", 0.07, 0, i * 0.05)); },
-    shield() { [392, 523, 784].forEach((f, i) => tone(f, 0.35, "sine", 0.06, 0, i * 0.04)); },
-    shieldBreak() { noise(0.3, 0.14, 3200, "highpass"); tone(700, 0.25, "triangle", 0.08, 200); },
-    magnet() { tone(180, 0.4, "sawtooth", 0.035, 360); tone(270, 0.4, "sine", 0.05, 540); },
-    sun() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.2, "sine", 0.06, 0, i * 0.06)); },
-    turbo() { tone(160, 0.6, "sawtooth", 0.05, 900); noise(0.6, 0.06, 400, "bandpass", 3000); },
-    smash() { noise(0.18, 0.13, 1800); tone(240, 0.12, "square", 0.04, 120); },
-    level() { [440, 554, 659, 880].forEach((f, i) => tone(f, 0.16, "triangle", 0.07, 0, i * 0.08)); },
-    crash() { noise(0.6, 0.22, 900, "lowpass", 120); tone(110, 0.5, "sawtooth", 0.08, 40); },
-    board() { tone(220, 0.3, "sawtooth", 0.05, 880); tone(440, 0.25, "sine", 0.06, 1320, 0.05); },
-    boardBreak() { noise(0.4, 0.18, 2600, "highpass"); tone(900, 0.3, "triangle", 0.08, 160); },
-    graze() { noise(0.18, 0.12, 700); tone(160, 0.2, "square", 0.05, 90); },
-    chaser() { tone(70, 0.6, "sawtooth", 0.06, 55); tone(105, 0.6, "sawtooth", 0.04, 80, 0.1); },
-    letter() { [988, 1319, 1568].forEach((f, i) => tone(f, 0.12, "sine", 0.07, 0, i * 0.05)); },
-    word() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.22, "triangle", 0.08, 0, i * 0.09)); },
-    box() { tone(330, 0.5, "triangle", 0.06, 660); [784, 988, 1175, 1568].forEach((f, i) => tone(f, 0.3, "sine", 0.07, 0, 0.55 + i * 0.07)); noise(0.3, 0.1, 3000, "highpass"); },
-    buy() { tone(660, 0.08, "sine", 0.07); tone(990, 0.14, "sine", 0.07, 0, 0.07); },
-    mission() { [659, 784, 1047].forEach((f, i) => tone(f, 0.16, "triangle", 0.07, 0, i * 0.08)); }
-  };
+  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  return ctx;
 }
+function tone(freq, dur, { type = "sine", vol = 0.25, to = null, delay = 0, attack = 0.005 } = {}) {
+  const c = ac(); if (!c || !on) return;
+  const t = c.currentTime + delay, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, { vol = 0.2, f0 = 800, f1 = 2400, q = 1, type = "bandpass", delay = 0 } = {}) {
+  const c = ac(); if (!c || !on) return;
+  const t = c.currentTime + delay, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = noiseBuf; f.type = type; f.Q.value = q;
+  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.02);
+}
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+
+export const Ses = {
+  unlock() { ac(); },
+  setOn(v) { on = !!v; if (master) master.gain.value = on ? 0.5 : 0; },
+  get on() { return on; },
+  /* Ardışık her vitaminde nota yükselir */
+  collect(streak) { const i = Math.min(SCALE.length - 1, streak % 12 === 0 && streak ? SCALE.length - 1 : (streak % 11)); const n = 72 + SCALE[i]; tone(midi(n), 0.16, { type: "triangle", vol: 0.22 }); tone(midi(n + 12), 0.1, { vol: 0.06, delay: 0.02 }); },
+  jump() { noise(0.22, { vol: 0.16, f0: 500, f1: 2600, q: 0.8 }); tone(260, 0.16, { to: 520, vol: 0.08 }); },
+  superJump() { noise(0.35, { vol: 0.2, f0: 400, f1: 3600, q: 0.7 }); tone(220, 0.3, { to: 880, vol: 0.12, type: "triangle" }); },
+  slide() { noise(0.4, { vol: 0.14, f0: 1800, f1: 300, q: 0.6 }); },
+  land() { tone(140, 0.09, { to: 70, vol: 0.14 }); },
+  lane() { noise(0.08, { vol: 0.06, f0: 1400, f1: 2200, q: 1.2 }); },
+  tramp() { tone(180, 0.28, { to: 720, vol: 0.2, type: "square" }); tone(360, 0.2, { to: 1080, vol: 0.08, delay: 0.03 }); },
+  smash() { noise(0.35, { vol: 0.4, f0: 2600, f1: 200, q: 0.4 }); tone(120, 0.3, { to: 40, vol: 0.35 }); tone(900, 0.12, { to: 300, vol: 0.1, type: "square" }); },
+  stumble() { tone(200, 0.22, { to: 80, vol: 0.3, type: "sawtooth" }); noise(0.2, { vol: 0.2, f0: 600, f1: 150, q: 0.5 }); },
+  power() { [0, 4, 7, 12].forEach((s, i) => tone(midi(72 + s), 0.14, { type: "triangle", vol: 0.18, delay: i * 0.06 })); },
+  shield() { tone(330, 0.35, { to: 990, vol: 0.16, type: "triangle" }); noise(0.3, { vol: 0.08, f0: 900, f1: 5000, q: 2 }); },
+  frenzy() { [0, 4, 7, 12, 16, 19, 24].forEach((s, i) => tone(midi(67 + s), 0.18, { type: "square", vol: 0.1, delay: i * 0.05 })); },
+  mission() { [0, 7, 12].forEach((s, i) => tone(midi(76 + s), 0.2, { type: "triangle", vol: 0.16, delay: i * 0.09 })); },
+  zone() { tone(midi(60), 0.5, { type: "triangle", vol: 0.14 }); tone(midi(67), 0.5, { type: "triangle", vol: 0.12, delay: 0.12 }); tone(midi(72), 0.6, { vol: 0.12, delay: 0.24 }); },
+  /* Kalp atışı: "lub-dub"; çağıran taraf tehdit yaklaştıkça aralığı kısaltır */
+  heart(intensity = 0.5) { const v = 0.22 + 0.2 * intensity; tone(62, 0.13, { to: 40, vol: v }); tone(54, 0.12, { to: 36, vol: v * 0.75, delay: 0.13 }); },
+  over() { tone(330, 0.5, { to: 82, vol: 0.3, type: "sawtooth" }); noise(0.6, { vol: 0.25, f0: 1200, f1: 80, q: 0.4 }); },
+  click() { tone(660, 0.05, { vol: 0.1, type: "triangle" }); },
+  buy() { [0, 5, 12].forEach((s, i) => tone(midi(79 + s), 0.12, { type: "triangle", vol: 0.16, delay: i * 0.07 })); },
+  deny() { tone(180, 0.14, { vol: 0.16, type: "square" }); }
+};
